@@ -30,7 +30,8 @@ working with event-driven systems. Aim: genuinely useful, easy to install, easy 
 | Browse | topics, partitions, configs, brokers | queues, exchanges, bindings, vhosts, connections, channels |
 | Messages | peek with filters (key, header, value, time/offset range), publish with key/headers | peek (get + requeue), publish with routing key/headers/properties |
 | Consumers | groups, members, assignments, lag; reset offsets; delete group; remove static member | consumers per queue; close connection |
-| Admin | create/delete topic, alter config, add partitions, delete records | declare/delete queue/exchange, bind/unbind, purge queue |
+| Admin | create/delete topic, alter config, add partitions, delete records | declare/delete queue/exchange, bind/unbind (exchange→queue and exchange→exchange), purge queue |
+| Routing | | dry-run route: which queues a routing key reaches through the binding graph, without publishing |
 | Ecosystem | Schema Registry (browse, Avro/Protobuf/JSON Schema serde), Kafka Connect, KSQL, ACLs | users, vhosts, permissions, policies, shovel, federation |
 | Metrics | throughput and lag over time | message and connection rates over time |
 
@@ -74,7 +75,8 @@ Capabilities (exact signatures are fixed in each milestone's spec):
 | `ConsumerTerminator` | disconnect a consumer | ✅ static members | ✅ close connection |
 | `TopicAdmin` | create/delete topic or queue, alter config | ✅ | ✅ |
 | `Purger` | remove messages (delete records / purge) | ✅ | ✅ |
-| `TopologyInspector` / `TopologyEditor` | exchanges and bindings | | ✅ |
+| `TopologyInspector` / `TopologyEditor` | exchanges and bindings (incl. exchange→exchange) | | ✅ |
+| `RouteSimulator` | resolve a routing key to destination queues from bindings | | ✅ |
 | `SchemaRegistry` | subjects, versions, serde | ✅ | |
 | `ConnectManager`, `KSQLRunner` | Kafka Connect, KSQL | ✅ | |
 | `ACLAdmin` | Kafka ACLs | ✅ | |
@@ -109,7 +111,8 @@ docs/ARCHITECTURE.md  docs/ADDING_A_BROKER.md
 2. **M1 Kafka core**: Ping, topics, Publish, Peek with filters, consumer groups, consumers, lag + CLI + integration tests.
 3. **M2 RabbitMQ core**: same core plus topology, consumers, connections/channels via Management API + tests.
 4. **M3 Admin and consumer management**: mutation guard; topic/queue CRUD and config; purge / delete records;
-   offset reset; delete group; terminate consumers; exchange/binding editing. Both brokers.
+   offset reset; delete group; terminate consumers; exchange/binding editing (incl. exchange→exchange);
+   `mqx route` dry-run routing. Both brokers.
 5. **M4 Kafka ecosystem**: Schema Registry (browse + serde in peek/publish), Kafka Connect, KSQL, ACLs.
 6. **M5 RabbitMQ administration**: users, vhosts, permissions, policies, shovel, federation.
 7. **M6 TUI**: context switcher, every capability as a panel, message viewer (JSON pretty-print), publish form,
@@ -122,6 +125,8 @@ docs/ARCHITECTURE.md  docs/ADDING_A_BROKER.md
 - Every feature in "v0.1 features" works from the CLI and the TUI against both brokers via the
   docker-compose test stack (Kafka + Schema Registry + Connect + ksqlDB, RabbitMQ with management plugin).
 - `mqx consumers <topic|queue>` shows who is attached, on both brokers.
+- `mqx route <exchange> --key <key>` matches RabbitMQ's actual routing for direct, topic and fanout
+  exchanges (verified against a real broker); headers and plugin exchanges are reported as "not simulated".
 - Mutating commands are refused on `read_only` contexts and require confirmation elsewhere.
 - TUI shows only panels the active broker supports.
 - Never commits secrets; credentials come from config file referencing env vars, not literals.
