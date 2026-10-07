@@ -1,22 +1,24 @@
 # M0 Skeleton — Design
 
-Date: 2026-10-07 · Status: approved in brainstorming, pending spec review · Source of truth: `CLAUDE.md`
+Date: 2026-10-07 (revised 2026-10-08: v0.1 scope widened, `read_only` added) · Status: approved in brainstorming, pending spec review · Source of truth: `CLAUDE.md`
 
 ## Goal
 
 Lay the foundation every later milestone builds on: module, layout, config contexts with
-env-var-only credentials, `mqx version`, `mqx ctx list`, `mqx ctx use`, lint and CI.
-Out of scope: broker adapters, registry, TUI, goreleaser (M1+).
+env-var-only credentials and a per-context `read_only` flag, `mqx version`, `mqx ctx list`,
+`mqx ctx use`, lint and CI.
+Out of scope: broker adapters, registry, mutation guard, TUI, goreleaser (M1+).
 
 ## Confirmed decisions
 
 | # | Decision |
 |---|---|
-| 1 | v0.1 feature set in `CLAUDE.md` confirmed as-is (topics, peek, publish, Kafka lag, RabbitMQ topology; TUI + CLI). |
+| 1 | v0.1 = feature parity with Kafka UI and the RabbitMQ Management UI, incl. consumer management (revised 2026-10-08; see `CLAUDE.md`). M0 itself is unaffected except decision 6. |
 | 2 | Credentials via dedicated `username_env` / `password_env` fields. Literal secrets are rejected. |
 | 3 | M0 creates only `cmd/mqx`, `internal/config`, `internal/cli` (plus `docs/` for this spec). Other layout dirs arrive with their milestone. |
 | 4 | Config path `~/.config/mqx/config.yaml` on every OS. Override order: `--config` > `$MQX_CONFIG` > default. No XDG handling. |
 | 5 | golangci-lint v2 installed locally with `go install …@<pinned>`; CI pins the same version. |
+| 6 | Each context has an optional `read_only` bool (default false). M0 stores, validates the type of, and displays it; the guard that enforces it arrives with the first mutating command (M3). |
 
 ## Layout
 
@@ -48,6 +50,10 @@ contexts:
     management_url: http://dev-host:15672
     username_env: MQX_RABBIT_USER
     password_env: MQX_RABBIT_PASS
+  - name: prod-kafka
+    broker: kafka
+    brokers: ["prod-1:9092", "prod-2:9092"]
+    read_only: true               # mutating commands refused (enforced from M3)
 ```
 
 ## `internal/config` API
@@ -66,6 +72,7 @@ type Context struct {
     ManagementURL string   `yaml:"management_url,omitempty"`
     UsernameEnv   string   `yaml:"username_env,omitempty"`
     PasswordEnv   string   `yaml:"password_env,omitempty"`
+    ReadOnly      bool     `yaml:"read_only,omitempty"`
 }
 
 type Credentials struct{ Username, Password string }
@@ -105,7 +112,7 @@ Validation never reads environment variables, so `ctx list` works without creden
 | Command | Behaviour |
 |---|---|
 | `mqx version` | Prints `mqx <version> (commit <sha>, built <date>, <goos>/<goarch>)`. Never reads config. |
-| `mqx ctx list` | Missing file: hint on stderr, exit 0. Prints `CURRENT NAME BROKER ENDPOINT` table, `*` on current. Invalid config: prints table, then problems, exit 1. |
+| `mqx ctx list` | Missing file: hint on stderr, exit 0. Prints `CURRENT NAME BROKER MODE ENDPOINT` table, `*` on current, MODE `ro` or `rw`. Invalid config: prints table, then problems, exit 1. |
 | `mqx ctx use <name>` | Missing file: error, exit 1. Invalid config or unknown name: error, file unchanged. Success: atomic save, prints `Switched to context "<name>".` |
 
 ## Error handling
@@ -122,11 +129,11 @@ Validation never reads environment variables, so `ctx list` works without creden
 
 Stdlib `testing`, table-driven, no testify.
 
-- config: Load (valid, missing, malformed, literal `password` key); every Validate rule plus a
+- config: Load (valid, missing, malformed, literal `password` key, `read_only` round-trip); every Validate rule plus a
   multi-error case; Save→Load round-trip and 0600 mode (perm check skipped on Windows); Use;
   Resolve with `t.Setenv`; DefaultPath with and without `$MQX_CONFIG`.
 - cli: in-process `NewRootCmd` with `SetArgs`/`SetOut`/`SetErr` against a `t.TempDir()` config,
-  covering version, ctx list (current marker, missing file), and ctx use (success changes file;
+  covering version, ctx list (current marker, `ro`/`rw` mode, missing file), and ctx use (success changes file;
   unknown name errors and leaves file unchanged).
 - Smoke: `go run ./cmd/mqx version|ctx list|ctx use` against a temp config.
 
