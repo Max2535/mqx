@@ -20,6 +20,10 @@ working with event-driven systems. Aim: genuinely useful, easy to install, easy 
 - v0.1 scope: feature parity with Kafka UI and the RabbitMQ Management UI (confirmed 2026-10-08), see
   "v0.1 features" below. Everything ships in v0.1; milestones order the work, not the releases.
 - Interfaces: TUI and non-interactive CLI, kubectl-style named contexts.
+- TUI entry: bare `mqx` opens the TUI when stdin and stdout are a TTY, otherwise prints help (never blocks
+  a script). `mqx tui` opens it explicitly and takes deep-link flags: `--context`, `--topic`, `--group`.
+  The TUI uses the same config, `--config` / `$MQX_CONFIG` and `current-context` as the CLI, and hides
+  mutating actions on `read_only` contexts.
 - Safety: a context can be marked `read_only: true`; every mutating command refuses to run against it.
   Mutating commands also require confirmation (`--yes` in the CLI, a confirm dialog in the TUI).
 
@@ -30,6 +34,7 @@ working with event-driven systems. Aim: genuinely useful, easy to install, easy 
 | Browse | topics, partitions, configs, brokers | queues, exchanges, bindings, vhosts, connections, channels |
 | Messages | peek with filters (key, header, value, time/offset range), publish with key/headers | peek (get + requeue), publish with routing key/headers/properties |
 | Consumers | groups, members, assignments, lag; reset offsets; delete group; remove static member | consumers per queue; close connection |
+| Rebalance debugging | `group describe` (state, coordinator, assignor, members, subscriptions), `group watch` (state-change timeline with rebalance duration), `group diagnose` (rule-based findings with fixes) | |
 | Admin | create/delete topic, alter config, add partitions, delete records | declare/delete queue/exchange, bind/unbind (exchange→queue and exchange→exchange), purge queue |
 | Routing | | dry-run route: which queues a routing key reaches through the binding graph, without publishing |
 | Ecosystem | Schema Registry (browse, Avro/Protobuf/JSON Schema serde), Kafka Connect, KSQL, ACLs | users, vhosts, permissions, policies, shovel, federation |
@@ -108,14 +113,16 @@ docs/ARCHITECTURE.md  docs/ADDING_A_BROKER.md
 ## Milestones
 
 1. **M0 Skeleton**: go.mod, layout, lint, CI, config contexts (incl. `read_only`), `mqx version`, `mqx ctx list/use`.
-2. **M1 Kafka core**: Ping, topics, Publish, Peek with filters, consumer groups, consumers, lag + CLI + integration tests.
+2. **M1 Kafka core**: Ping, topics, Publish, Peek with filters, consumer groups, consumers, lag,
+   `mqx group describe|watch|diagnose` (classic protocol + KIP-848 `ConsumerGroupDescribe` when available)
+   + CLI + integration tests.
 3. **M2 RabbitMQ core**: same core plus topology, consumers, connections/channels via Management API + tests.
 4. **M3 Admin and consumer management**: mutation guard; topic/queue CRUD and config; purge / delete records;
    offset reset; delete group; terminate consumers; exchange/binding editing (incl. exchange→exchange);
    `mqx route` dry-run routing. Both brokers.
 5. **M4 Kafka ecosystem**: Schema Registry (browse + serde in peek/publish), Kafka Connect, KSQL, ACLs.
 6. **M5 RabbitMQ administration**: users, vhosts, permissions, policies, shovel, federation.
-7. **M6 TUI**: context switcher, every capability as a panel, message viewer (JSON pretty-print), publish form,
+7. **M6 TUI**: `mqx` / `mqx tui` entry with deep links, context switcher, every capability as a panel, message viewer (JSON pretty-print), publish form,
    confirm dialogs, rate graphs, capability-driven panels.
 8. **M7 Release**: goreleaser, Homebrew tap, `go install`, README with GIF, ADDING_A_BROKER.md.
 9. **Later**: NATS JetStream, Redis Streams, AWS SQS/SNS, Pulsar, MQTT; Replayer capability.
@@ -127,6 +134,9 @@ docs/ARCHITECTURE.md  docs/ADDING_A_BROKER.md
 - `mqx consumers <topic|queue>` shows who is attached, on both brokers.
 - `mqx route <exchange> --key <key>` matches RabbitMQ's actual routing for direct, topic and fanout
   exchanges (verified against a real broker); headers and plugin exchanges are reported as "not simulated".
+- `mqx group diagnose` detects, in integration tests: a stale member left by an unclean shutdown,
+  more members than partitions, and one group id shared by apps subscribing to different topics.
+- Bare `mqx` opens the TUI on a TTY and prints help when piped; `mqx tui --context/--topic/--group` deep-links.
 - Mutating commands are refused on `read_only` contexts and require confirmation elsewhere.
 - TUI shows only panels the active broker supports.
 - Never commits secrets; credentials come from config file referencing env vars, not literals.
