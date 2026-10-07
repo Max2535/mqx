@@ -5,9 +5,10 @@
 
 ## Goal
 
-A single Go binary to inspect, publish, peek and (later) replay messages across message brokers
-through one interface. Interactive TUI plus non-interactive CLI. Target audience: backend developers
-debugging event-driven systems. Aim: genuinely useful, easy to install, easy to extend with new brokers.
+A single Go binary that covers what Kafka UI and the RabbitMQ Management UI do, across message
+brokers, through one interface: inspect, peek, publish, manage consumers and administer the cluster.
+Interactive TUI plus non-interactive CLI. Target audience: backend developers and platform engineers
+working with event-driven systems. Aim: genuinely useful, easy to install, easy to extend with new brokers.
 
 ## Decisions
 
@@ -16,9 +17,22 @@ debugging event-driven systems. Aim: genuinely useful, easy to install, easy to 
 - Project name: `mqx` (repo: Max2535/mqx)
 - License: MIT (LICENSE file already in repo)
 - v0.1 brokers: Kafka + RabbitMQ. Design for more from day one.
-- v0.1 features **[ASSUMED]**: list topics/queues, peek messages, publish, Kafka consumer lag,
-  RabbitMQ topology (exchanges/bindings/queues).
-- Interfaces: TUI and non-interactive CLI, kubectl-style named contexts **[ASSUMED]**.
+- v0.1 scope: feature parity with Kafka UI and the RabbitMQ Management UI (confirmed 2026-10-08), see
+  "v0.1 features" below. Everything ships in v0.1; milestones order the work, not the releases.
+- Interfaces: TUI and non-interactive CLI, kubectl-style named contexts.
+- Safety: a context can be marked `read_only: true`; every mutating command refuses to run against it.
+  Mutating commands also require confirmation (`--yes` in the CLI, a confirm dialog in the TUI).
+
+## v0.1 features
+
+| Area | Kafka | RabbitMQ |
+|---|---|---|
+| Browse | topics, partitions, configs, brokers | queues, exchanges, bindings, vhosts, connections, channels |
+| Messages | peek with filters (key, header, value, time/offset range), publish with key/headers | peek (get + requeue), publish with routing key/headers/properties |
+| Consumers | groups, members, assignments, lag; reset offsets; delete group; remove static member | consumers per queue; close connection |
+| Admin | create/delete topic, alter config, add partitions, delete records | declare/delete queue/exchange, bind/unbind, purge queue |
+| Ecosystem | Schema Registry (browse, Avro/Protobuf/JSON Schema serde), Kafka Connect, KSQL, ACLs | users, vhosts, permissions, policies, shovel, federation |
+| Metrics | throughput and lag over time | message and connection rates over time |
 
 ## Libraries
 
@@ -26,8 +40,10 @@ debugging event-driven systems. Aim: genuinely useful, easy to install, easy to 
 |---|---|
 | TUI | Bubble Tea + Bubbles + Lip Gloss |
 | CLI | cobra |
-| Kafka | franz-go (`kgo`, `kadm`) |
-| RabbitMQ | amqp091-go (data) + Management HTTP API (topology/stats) |
+| Kafka | franz-go (`kgo`, `kadm`, `sr` for Schema Registry) |
+| Kafka Connect, KSQL | REST via `net/http` |
+| RabbitMQ | amqp091-go (data) + Management HTTP API (topology, stats, admin) |
+| Avro / Protobuf serde | chosen in M4; ask the owner before adding |
 | Config | YAML (`gopkg.in/yaml.v3`), contexts file at `~/.config/mqx/config.yaml` |
 | Tests | stdlib `testing`, testcontainers-go for integration |
 | Lint/CI | golangci-lint, GitHub Actions, goreleaser for releases |
@@ -46,22 +62,31 @@ type Broker interface {
     Peek(ctx context.Context, topic string, opts PeekOptions) (<-chan Message, error)
     Close() error
 }
-
-type LagReporter interface {
-    ConsumerLag(ctx context.Context, group string) ([]Lag, error)
-}
-
-type TopologyInspector interface {
-    Topology(ctx context.Context) (Topology, error)
-}
-
-type Replayer interface { // post v0.1
-    Replay(ctx context.Context, topic string, from Position, to string) error
-}
 ```
+
+Capabilities (exact signatures are fixed in each milestone's spec):
+
+| Capability | Responsibility | Kafka | RabbitMQ |
+|---|---|---|---|
+| `ConsumerInspector` | consumers / groups attached to a topic or queue | ✅ | ✅ |
+| `LagReporter` | per-partition lag for a group | ✅ | |
+| `OffsetManager` | reset offsets, delete group | ✅ | |
+| `ConsumerTerminator` | disconnect a consumer | ✅ static members | ✅ close connection |
+| `TopicAdmin` | create/delete topic or queue, alter config | ✅ | ✅ |
+| `Purger` | remove messages (delete records / purge) | ✅ | ✅ |
+| `TopologyInspector` / `TopologyEditor` | exchanges and bindings | | ✅ |
+| `SchemaRegistry` | subjects, versions, serde | ✅ | |
+| `ConnectManager`, `KSQLRunner` | Kafka Connect, KSQL | ✅ | |
+| `ACLAdmin` | Kafka ACLs | ✅ | |
+| `UserAdmin`, `PolicyAdmin` | users, vhosts, permissions, policies, shovel, federation | | ✅ |
+| `MetricsReporter` | rates over time for graphs | ✅ | ✅ |
+| `Replayer` | replay a range (post v0.1) | | |
 
 Registry pattern: each adapter registers a factory in `init()` keyed by broker type, so adding a broker
 means adding one package and one blank import.
+
+Every method of a mutating capability goes through one guard in `internal/cli` / `internal/tui` that
+checks `read_only` and confirmation. Adapters never check it themselves.
 
 ## Layout
 
@@ -80,17 +105,24 @@ docs/ARCHITECTURE.md  docs/ADDING_A_BROKER.md
 
 ## Milestones
 
-1. **M0 Skeleton**: go.mod, layout, lint, CI, config contexts, `mqx version`, `mqx ctx list/use`.
-2. **M1 Kafka adapter**: Ping, ListTopics, Publish, Peek, ConsumerLag + CLI commands + integration tests.
-3. **M2 RabbitMQ adapter**: same core plus Topology via Management API + tests.
-4. **M3 TUI**: context switcher, topic list, message viewer (JSON pretty-print), publish form, capability-driven panels.
-5. **M4 Release**: goreleaser, Homebrew tap, `go install`, README with GIF, ADDING_A_BROKER.md.
-6. **Later**: NATS JetStream, Redis Streams, AWS SQS/SNS, Pulsar, MQTT; Replayer capability.
+1. **M0 Skeleton**: go.mod, layout, lint, CI, config contexts (incl. `read_only`), `mqx version`, `mqx ctx list/use`.
+2. **M1 Kafka core**: Ping, topics, Publish, Peek with filters, consumer groups, consumers, lag + CLI + integration tests.
+3. **M2 RabbitMQ core**: same core plus topology, consumers, connections/channels via Management API + tests.
+4. **M3 Admin and consumer management**: mutation guard; topic/queue CRUD and config; purge / delete records;
+   offset reset; delete group; terminate consumers; exchange/binding editing. Both brokers.
+5. **M4 Kafka ecosystem**: Schema Registry (browse + serde in peek/publish), Kafka Connect, KSQL, ACLs.
+6. **M5 RabbitMQ administration**: users, vhosts, permissions, policies, shovel, federation.
+7. **M6 TUI**: context switcher, every capability as a panel, message viewer (JSON pretty-print), publish form,
+   confirm dialogs, rate graphs, capability-driven panels.
+8. **M7 Release**: goreleaser, Homebrew tap, `go install`, README with GIF, ADDING_A_BROKER.md.
+9. **Later**: NATS JetStream, Redis Streams, AWS SQS/SNS, Pulsar, MQTT; Replayer capability.
 
 ## Acceptance criteria for v0.1
 
-- `mqx topics`, `mqx peek <topic>`, `mqx publish <topic>`, `mqx lag <group>` work against both brokers
-  via docker-compose test stack.
+- Every feature in "v0.1 features" works from the CLI and the TUI against both brokers via the
+  docker-compose test stack (Kafka + Schema Registry + Connect + ksqlDB, RabbitMQ with management plugin).
+- `mqx consumers <topic|queue>` shows who is attached, on both brokers.
+- Mutating commands are refused on `read_only` contexts and require confirmation elsewhere.
 - TUI shows only panels the active broker supports.
 - Never commits secrets; credentials come from config file referencing env vars, not literals.
 - `go vet`, `golangci-lint`, `go test ./...` pass in CI; integration tests run via testcontainers.
@@ -108,7 +140,7 @@ docs/ARCHITECTURE.md  docs/ADDING_A_BROKER.md
 
 ```
 Read CLAUDE.md. Implement milestone M0 only: repo skeleton, go.mod, folder layout, golangci-lint config,
-GitHub Actions CI, config contexts (load/validate/use), and `mqx version` plus `mqx ctx list/use`.
+GitHub Actions CI, config contexts (load/validate/use, read_only flag), and `mqx version` plus `mqx ctx list/use`.
 Include unit tests. Before coding, show me a short plan and list any assumptions marked [ASSUMED]
 that you want me to confirm. Stop after M0 and summarize.
 ```
