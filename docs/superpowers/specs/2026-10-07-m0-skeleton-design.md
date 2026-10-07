@@ -149,7 +149,8 @@ unconvert, bodyclose; formatters gofmt and goimports.
 
 ## Toolchain and dependencies
 
-- `go.mod`: module `github.com/Max2535/mqx`, `go 1.24`.
+- `go.mod`: module `github.com/Max2535/mqx`, `go 1.26` (1.24 is EOL; owner chose 1.26 on 2026-10-08).
+  Local go1.24.4 auto-switches via `GOTOOLCHAIN=auto` (the current default); CI reads the version from `go.mod`.
 - Dependencies: `github.com/spf13/cobra`, `gopkg.in/yaml.v3` only.
 
 ## Delivery
