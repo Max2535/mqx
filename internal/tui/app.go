@@ -44,7 +44,7 @@ const (
 )
 
 type globalKeys struct {
-	quit, help, contexts, next, prev key.Binding
+	quit, help, contexts, palette, next, prev key.Binding
 }
 
 func newGlobalKeys() globalKeys {
@@ -52,12 +52,15 @@ func newGlobalKeys() globalKeys {
 		quit:     key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 		help:     key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		contexts: key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "context")),
+		palette:  key.NewBinding(key.WithKeys(":", "ctrl+p"), key.WithHelp(":", "commands")),
 		next:     key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next panel")),
 		prev:     key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "prev panel")),
 	}
 }
 
-func (k globalKeys) list() []key.Binding { return []key.Binding{k.next, k.contexts, k.help, k.quit} }
+func (k globalKeys) list() []key.Binding {
+	return []key.Binding{k.palette, k.next, k.contexts, k.help, k.quit}
+}
 
 // app is the root model: header, navigation, the active panel, footer and overlays.
 type app struct {
@@ -77,6 +80,8 @@ type app struct {
 	help      help.Model
 	spinner   spinner.Model
 	store     *contextStore
+	history   *formHistory
+	recent    *recentCommands
 }
 
 // openedMsg reports the result of opening a context.
@@ -98,7 +103,8 @@ func newApp(c appConfig) *app {
 		c.base = context.Background()
 	}
 	return &app{appConfig: c, width: 100, height: 30, keys: newGlobalKeys(), help: help.New(),
-		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)), store: &contextStore{cfg: c.cfg, path: c.path}}
+		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)), store: &contextStore{cfg: c.cfg, path: c.path},
+		history: newFormHistory(), recent: &recentCommands{}}
 }
 
 // Init implements tea.Model.
@@ -149,7 +155,7 @@ func (a *app) opened(m openedMsg) tea.Cmd {
 	base, cancel := context.WithCancel(a.base)
 	a.cancelEnv = cancel
 	a.e = &env{ctx: m.c, b: m.b, base: base, timeout: a.timeout, now: a.now, tick: a.tick, gen: a.gen, ids: &ids,
-		spin: a.spinner.View()}
+		spin: a.spinner.View(), history: a.history}
 	a.conn, a.connErr = connOK, ""
 	if m.pingErr != nil {
 		a.conn, a.connErr = connFailed, m.pingErr.Error()
@@ -245,6 +251,13 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 	case switchContextMsg:
 		return a, a.openContext(m.name)
+	case panelKeyMsg:
+		return a, a.forward(m.key)
+	case gotoPanelMsg:
+		if m.i < 0 || m.i >= len(a.panels) {
+			return a, nil
+		}
+		return a, a.switchPanel(m.i - a.active)
 	case contextsChangedMsg:
 		return a, a.contextsChanged(m)
 	case deleteContextMsg:
@@ -304,6 +317,9 @@ func (a *app) key(m tea.KeyMsg) tea.Cmd {
 	case key.Matches(m, a.keys.contexts):
 		a.overlay = a.switcher("")
 		return nil
+	case key.Matches(m, a.keys.palette):
+		a.overlay = newPalette(a.commands(), a.recent)
+		return nil
 	case key.Matches(m, a.keys.next):
 		return a.switchPanel(1)
 	case key.Matches(m, a.keys.prev):
@@ -347,7 +363,7 @@ func (a *app) helpOverlay() *helpOverlay {
 		h.groups = append(h.groups, a.panels[a.active].Keys())
 		h.titles = append(h.titles, a.panels[a.active].Title())
 	}
-	h.groups = append(h.groups, []key.Binding{a.keys.next, a.keys.prev, a.keys.contexts, a.keys.help, a.keys.quit})
+	h.groups = append(h.groups, []key.Binding{a.keys.palette, a.keys.next, a.keys.prev, a.keys.contexts, a.keys.help, a.keys.quit})
 	h.titles = append(h.titles, "Global")
 	return h
 }

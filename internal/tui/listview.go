@@ -29,6 +29,8 @@ type resource struct {
 	focusOpen func(r row) panel
 	// stale reports whether the list must reload when its panel is shown again.
 	stale func() bool
+	// loaded sees every successful load, on the UI goroutine.
+	loaded func(l listing)
 }
 
 // listing is a loaded resource. cols, when set, overrides resource.cols.
@@ -133,6 +135,15 @@ func (lv *listView) Update(msg tea.Msg) (panel, tea.Cmd) {
 		}
 	case loadedMsg:
 		return lv, lv.applyLoaded(m)
+	case jumpMsg:
+		for i, r := range lv.lst.rows {
+			if r.key == m.key {
+				lv.t.selectRow(i)
+				lv.selected()
+				return lv, nil
+			}
+		}
+		return lv, statusErr(fmt.Errorf("%q is no longer in the list", m.key))
 	case tea.KeyMsg:
 		return lv, lv.key(m)
 	}
@@ -150,6 +161,9 @@ func (lv *listView) applyLoaded(m loadedMsg) tea.Cmd {
 		return nil
 	}
 	lv.lst = m.l
+	if lv.r().loaded != nil {
+		lv.r().loaded(m.l)
+	}
 	cols := lv.r().cols
 	if m.l.cols != nil {
 		cols = m.l.cols
@@ -223,6 +237,15 @@ func (lv *listView) key(m tea.KeyMsg) tea.Cmd {
 		}
 	}
 	return nil
+}
+
+// jumpTargets implements jumper.
+func (lv *listView) jumpTargets() (string, []string) {
+	keys := make([]string, len(lv.lst.rows))
+	for i, r := range lv.lst.rows {
+		keys[i] = r.key
+	}
+	return lv.r().title, keys
 }
 
 // Keys implements panel.

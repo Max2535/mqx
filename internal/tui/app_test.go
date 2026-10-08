@@ -109,7 +109,7 @@ func TestReadOnlyHidesMutatingActions(t *testing.T) {
 	wantCalls(t, f)
 
 	// The guard itself refuses even if a view asked.
-	msg := h.a.e.mutate(1, "Delete topic orders", "", func(context.Context) tea.Msg { return nil })()
+	msg := h.a.e.mutate(1, "Delete topic orders", "", "", func(context.Context) tea.Msg { return nil })()
 	if s, ok := msg.(statusMsg); !ok || !s.err || !strings.Contains(s.text, "read_only") {
 		t.Fatalf("guard on read_only = %#v", msg)
 	}

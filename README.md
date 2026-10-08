@@ -117,6 +117,7 @@ KSQL, ACLs, users and policies, and rate graphs.
 
 | Key | Action |
 |---|---|
+| `:` or `ctrl+p` | command palette: fuzzy-find any action of the current view, a row to jump to, a panel or a context |
 | `tab` / `shift+tab` | next / previous panel |
 | `↑` `↓` / `j` `k`, `enter`, `esc` | move, open, back |
 | `/` | filter |
@@ -125,6 +126,12 @@ KSQL, ACLs, users and policies, and rate graphs.
 | `c` | contexts: `enter` open, `t` test connection, `n` new, `e` edit, `d` delete, `u` set default |
 | `?` | help, including the keys of the current panel |
 | `q` | quit |
+
+In forms, `ctrl+r` brings back what you submitted earlier in the same form (newest
+first, secrets excluded), and key/value fields such as Headers accept either
+`k=v` lines or a JSON object. Publishing to a topic the broker marks internal,
+such as `__consumer_offsets`, asks you to type its name; the CLI needs
+`--allow-internal`.
 
 Contexts edited in the TUI are saved to the config file. With no config file
 yet, the TUI opens empty: press `c` then `n` to create the first context.

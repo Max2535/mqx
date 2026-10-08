@@ -1,7 +1,11 @@
 package tui
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strconv"
 	"strings"
@@ -54,8 +58,12 @@ func parsePartitions(s string) ([]int32, error) {
 	return out, nil
 }
 
-// parseKV parses "k=v" entries separated by newlines or commas into ordered pairs.
+// parseKV parses "k=v" entries separated by newlines or commas, or a JSON
+// object, into ordered pairs.
 func parseKV(s string) ([][2]string, error) {
+	if t := strings.TrimSpace(s); strings.HasPrefix(t, "{") {
+		return parseJSONObject(t)
+	}
 	var out [][2]string
 	for _, line := range strings.FieldsFunc(s, func(r rune) bool { return r == '\n' || r == ',' }) {
 		line = strings.TrimSpace(line)
@@ -65,11 +73,60 @@ func parseKV(s string) ([][2]string, error) {
 		k, v, ok := strings.Cut(line, "=")
 		k = strings.TrimSpace(k)
 		if !ok || k == "" {
-			return nil, fmt.Errorf("invalid entry %q; want key=value", line)
+			return nil, fmt.Errorf("invalid entry %q; want key=value or a JSON object", line)
 		}
 		out = append(out, [2]string{k, strings.TrimSpace(v)})
 	}
 	return out, nil
+}
+
+// parseJSONObject parses a flat JSON object into ordered pairs, keeping the
+// key order. String values are taken as is; other values keep their JSON text
+// and null is empty.
+func parseJSONObject(s string) ([][2]string, error) {
+	dec := json.NewDecoder(strings.NewReader(s))
+	invalid := func(err error) error { return fmt.Errorf("invalid JSON object: %w", err) }
+	if _, err := dec.Token(); err != nil {
+		return nil, invalid(err)
+	}
+	var out [][2]string
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return nil, invalid(err)
+		}
+		k, _ := tok.(string)
+		if k == "" {
+			return nil, errors.New("invalid JSON object: empty key")
+		}
+		var raw json.RawMessage
+		if err := dec.Decode(&raw); err != nil {
+			return nil, invalid(err)
+		}
+		out = append(out, [2]string{k, jsonText(raw)})
+	}
+	if _, err := dec.Token(); err != nil {
+		return nil, invalid(err)
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return nil, errors.New("invalid JSON object: unexpected text after the closing }")
+	}
+	return out, nil
+}
+
+func jsonText(raw json.RawMessage) string {
+	var str string
+	if err := json.Unmarshal(raw, &str); err == nil {
+		return str
+	}
+	if string(raw) == "null" {
+		return ""
+	}
+	var b bytes.Buffer
+	if err := json.Compact(&b, raw); err != nil {
+		return string(raw)
+	}
+	return b.String()
 }
 
 // parseKVMap is parseKV into a map; nil when empty.

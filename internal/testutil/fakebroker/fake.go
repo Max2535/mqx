@@ -265,7 +265,7 @@ func (f *Fake) topicInfoLocked(name string) broker.Topic {
 		n += int64(len(p))
 	}
 	return broker.Topic{Name: name, Kind: "topic", Partitions: len(t.partitions), Replicas: 1, Messages: n,
-		Consumers: len(f.consumers[name])}
+		Consumers: len(f.consumers[name]), Internal: strings.HasPrefix(name, "__")} // like Kafka's __consumer_offsets
 }
 
 // Publish implements broker.Broker.
