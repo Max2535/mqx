@@ -77,6 +77,18 @@ func TestValidate(t *testing.T) {
 			secret: "s3cret",
 		},
 		{
+			name:   "host-less url hiding a password",
+			cfg:    Config{Contexts: []Context{withURL(rabbitCtx("a"), "guest:s3cret@localhost:5672")}},
+			want:   []string{`context "a": url must be an absolute URL with a host`},
+			secret: "s3cret",
+		},
+		{
+			name:   "host-less management_url hiding a password",
+			cfg:    Config{Contexts: []Context{withMgmtURL(rabbitCtx("a"), "guest:s3cret@localhost:15672")}},
+			want:   []string{`context "a": management_url must be an absolute URL with a host`},
+			secret: "s3cret",
+		},
+		{
 			name:   "unparseable url does not echo it",
 			cfg:    Config{Contexts: []Context{withURL(rabbitCtx("a"), "amqp://u:s3cret%zz@localhost/")}},
 			want:   []string{`context "a": url is not a valid URL`},

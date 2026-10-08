@@ -108,7 +108,7 @@ func endpoint(c config.Context) string {
 		return strings.Join(c.Brokers, ",")
 	}
 	u, err := url.Parse(c.URL)
-	if err != nil {
+	if err != nil || u.Host == "" {
 		return "<invalid url>"
 	}
 	return u.Redacted()

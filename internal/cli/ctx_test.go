@@ -62,6 +62,15 @@ func TestCtxList(t *testing.T) {
 			},
 			wantErr: "must not embed a password",
 		},
+		{
+			name:    "host-less url is not echoed",
+			content: "contexts:\n  - name: sneaky\n    broker: rabbitmq\n    url: guest:s3cret@localhost:5672\n",
+			wantLines: [][]string{
+				{"CURRENT", "NAME", "BROKER", "MODE", "ENDPOINT"},
+				{"sneaky", "rabbitmq", "rw", "<invalid", "url>"},
+			},
+			wantErr: "must be an absolute URL with a host",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

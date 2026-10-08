@@ -12,6 +12,7 @@ const supportedBrokers = "kafka, rabbitmq"
 
 var (
 	errInvalidURL     = errors.New("is not a valid URL; check for unescaped characters")
+	errNoHost         = errors.New("must be an absolute URL with a host, e.g. amqp://host:5672/")
 	errEmbeddedSecret = errors.New("must not embed a password; remove it and set password_env")
 )
 
@@ -72,6 +73,10 @@ func checkNoPassword(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return errInvalidURL
+	}
+	// Without "//" the userinfo is not parsed (u.User is nil), so a password could slip past.
+	if u.Host == "" {
+		return errNoHost
 	}
 	if u.User != nil {
 		if _, ok := u.User.Password(); ok {
