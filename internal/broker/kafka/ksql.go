@@ -34,6 +34,9 @@ func (k *Kafka) RunKSQL(ctx context.Context, statement string) (*broker.KSQLResu
 	if IsKSQLQuery(stmt) {
 		return k.ksqlQuery(ctx, stmt)
 	}
+	if f := strings.Fields(stmt); strings.EqualFold(f[0], "PRINT") {
+		return nil, fmt.Errorf("PRINT streams raw topic records; use `mqx peek <topic>` instead: %w", broker.ErrUnsupported)
+	}
 	var entities []map[string]any
 	body := map[string]any{"ksql": stmt, "streamsProperties": map[string]any{}}
 	if err := k.ksql.do(ctx, http.MethodPost, "/ksql", body, &entities); err != nil {

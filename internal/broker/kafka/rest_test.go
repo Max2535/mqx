@@ -195,6 +195,7 @@ func TestRunKSQL(t *testing.T) {
 				`[1,"a"]` + "\n" + `[2,"b"]` + "\n",
 			want: broker.KSQLResult{Columns: []string{"ID", "NAME"}, Rows: [][]any{{1.0, "a"}, {2.0, "b"}}},
 		},
+		{name: "print points at peek", stmt: "print 'orders';", path: "/ksql", wantErr: "use `mqx peek <topic>` instead"},
 		{
 			name: "statement error carries the server message", stmt: "SHOW NOPE", path: "/ksql", status: 400,
 			response: `{"@type":"statement_error","error_code":40001,"message":"line 1:6: Syntax Error"}`,
