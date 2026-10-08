@@ -20,7 +20,8 @@ func newCtxCmd(opts *options) *cobra.Command {
 		Use:   "ctx",
 		Short: "Manage named broker contexts",
 	}
-	cmd.AddCommand(newCtxListCmd(opts), newCtxUseCmd(opts), newCtxDescribeCmd(opts))
+	cmd.AddCommand(newCtxListCmd(opts), newCtxUseCmd(opts), newCtxDescribeCmd(opts),
+		newCtxAddCmd(opts), newCtxSetCmd(opts), newCtxDeleteCmd(opts))
 	return cmd
 }
 

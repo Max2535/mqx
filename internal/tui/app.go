@@ -22,6 +22,7 @@ const navWidth = 18
 // timers and broker opener.
 type appConfig struct {
 	cfg     *config.Config
+	path    string // config file that context edits are saved to
 	initial string // context to open first; "" = none
 	links   deepLinks
 	status  statusMsg // initial status, e.g. an unknown --context
@@ -75,6 +76,7 @@ type app struct {
 	keys      globalKeys
 	help      help.Model
 	spinner   spinner.Model
+	store     *contextStore
 }
 
 // openedMsg reports the result of opening a context.
@@ -96,7 +98,7 @@ func newApp(c appConfig) *app {
 		c.base = context.Background()
 	}
 	return &app{appConfig: c, width: 100, height: 30, keys: newGlobalKeys(), help: help.New(),
-		spinner: spinner.New(spinner.WithSpinner(spinner.Dot))}
+		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)), store: &contextStore{cfg: c.cfg, path: c.path}}
 }
 
 // Init implements tea.Model.
@@ -243,6 +245,15 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 	case switchContextMsg:
 		return a, a.openContext(m.name)
+	case contextsChangedMsg:
+		return a, a.contextsChanged(m)
+	case deleteContextMsg:
+		err := a.store.update(func(c *config.Config) error { return c.Remove(m.name) })
+		if err != nil {
+			return a, statusErr(err)
+		}
+		return a, a.contextsChanged(contextsChangedMsg{old: m.name,
+			status: fmt.Sprintf("deleted context %s from %s", m.name, a.store.path)})
 	case openedMsg:
 		return a, a.opened(m)
 	case routedMsg:
@@ -291,11 +302,7 @@ func (a *app) key(m tea.KeyMsg) tea.Cmd {
 		a.overlay = a.helpOverlay()
 		return nil
 	case key.Matches(m, a.keys.contexts):
-		current := a.target
-		if a.e != nil {
-			current = a.e.ctx.Name
-		}
-		a.overlay = newContextSwitcher(a.cfg.Contexts, current)
+		a.overlay = a.switcher("")
 		return nil
 	case key.Matches(m, a.keys.next):
 		return a.switchPanel(1)
@@ -303,6 +310,35 @@ func (a *app) key(m tea.KeyMsg) tea.Cmd {
 		return a.switchPanel(-1)
 	}
 	return a.forward(m)
+}
+
+// openName is the context open in this session, or being opened.
+func (a *app) openName() string {
+	if a.e != nil {
+		return a.e.ctx.Name
+	}
+	return a.target
+}
+
+func (a *app) switcher(focus string) *contextSwitcher {
+	probe := func(c config.Context) tea.Cmd { return probeContext(a.base, a.timeout, a.now, a.open, c) }
+	return newContextSwitcher(a.store, a.openName(), focus, probe)
+}
+
+// contextsChanged follows a saved edit: an edited open context is reopened with
+// its new settings, a deleted one is closed. The switcher stays open.
+func (a *app) contextsChanged(m contextsChangedMsg) tea.Cmd {
+	var cmd tea.Cmd
+	if m.old != "" && m.old == a.openName() {
+		if m.name == "" {
+			a.shutdown()
+			a.conn, a.target, a.connErr = connNone, "", ""
+		} else {
+			cmd = a.openContext(m.name)
+		}
+	}
+	a.overlay = a.switcher(m.name)
+	return tea.Batch(cmd, statusInfo(m.status))
 }
 
 func (a *app) helpOverlay() *helpOverlay {

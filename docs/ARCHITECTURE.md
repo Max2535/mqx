@@ -57,17 +57,24 @@ Each adapter registers a `broker.Driver` in `init()`:
 
 ```go
 func init() {
-    broker.Register("kafka", broker.Driver{Open: open, Validate: validate})
+    broker.Register("kafka", broker.Driver{Open: open, Validate: validate, Fields: []string{"brokers", ...}})
 }
 ```
 
 `Open` connects from a `config.Context` plus resolved `config.Credentials`;
-`Validate` checks broker-specific fields offline. `internal/config` knows nothing
+`Validate` checks broker-specific fields offline; `Fields` names the
+`config.Fields()` keys the broker uses, which is all the context editors (the
+TUI form and `mqx ctx add/set` flags) need to show the right inputs. `internal/config` knows nothing
 about individual brokers: `Config.Validate` takes a `config.BrokerValidator`,
 which the registry implements. `cmd/mqx/main.go` blank-imports each adapter.
 The registry is the only package-level mutable state in mqx.
 
 ## Config and credentials
+
+Editors change contexts through `Config.Update`, which applies the edit,
+validates the whole file and saves it, or leaves everything unchanged on any
+error. Saving writes back into the YAML tree that was loaded, so comments and
+key order survive.
 
 `~/.config/mqx/config.yaml` (or `--config` / `$MQX_CONFIG`) holds named contexts,
 kubectl style. Credentials are never stored in the file: `username_env` and

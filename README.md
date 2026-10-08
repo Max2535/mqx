@@ -75,7 +75,17 @@ Credentials are never stored in the file. `username_env` and `password_env` name
 the environment variables that hold them. A literal `password:` key, or a password
 inside a URL, is rejected.
 
+Create and change contexts from the CLI or the TUI instead of editing the file.
+Either way the file keeps its comments, and the result is validated before it
+is saved.
+
 ```sh
+mqx ctx add local --broker kafka --brokers localhost:9092 --schema-registry-url http://localhost:8081
+mqx ctx add prod --broker kafka --brokers k1:9093,k2:9093 --sasl-mechanism SCRAM-SHA-512 \
+  --username-env PROD_KAFKA_USER --password-env PROD_KAFKA_PASS --tls-enabled --read-only
+mqx ctx set prod --tls-ca-file /etc/ssl/prod-ca.pem   # only the flags given change
+mqx ctx delete old-kafka --yes
+
 mqx ctx list                 # * marks the current context
 mqx ctx use dev-rabbit
 mqx ctx describe             # connectivity and what this broker supports
@@ -106,9 +116,12 @@ KSQL, ACLs, users and policies, and rate graphs.
 | `/` | filter |
 | `r` | refresh |
 | `p` | publish |
-| `c` | switch context |
+| `c` | contexts: `enter` open, `t` test connection, `n` new, `e` edit, `d` delete, `u` set default |
 | `?` | help, including the keys of the current panel |
 | `q` | quit |
+
+Contexts edited in the TUI are saved to the config file. With no config file
+yet, the TUI opens empty: press `c` then `n` to create the first context.
 
 On `read_only` contexts mutating keys are hidden. Elsewhere, every mutation opens a
 confirm dialog whose default answer is Cancel.
