@@ -93,7 +93,7 @@ func newPolicySetCmd(o *options) *cobra.Command {
 				if err := pa.PutPolicy(ctx, p); err != nil {
 					return err
 				}
-				return o.done(cmd, "set policy %q", p.Name)
+				return o.done(cmd, "Set policy %q.", p.Name)
 			})
 		},
 	}
@@ -144,7 +144,7 @@ func newPolicyDeleteCmd(o *options) *cobra.Command {
 				if err := pa.DeletePolicy(ctx, name); err != nil {
 					return err
 				}
-				return o.done(cmd, "deleted policy %q", name)
+				return o.done(cmd, "Deleted policy %q.", name)
 			})
 		},
 	}
@@ -419,7 +419,7 @@ func putParam(cmd *cobra.Command, o *options, p broker.Parameter, what string) e
 		if err := pa.PutParameter(ctx, p); err != nil {
 			return errors.New(redactURI(err.Error())) // the broker may quote a URI back
 		}
-		return o.done(cmd, "set %s %q", what, p.Name)
+		return o.done(cmd, "Set %s %q.", what, p.Name)
 	})
 }
 
@@ -446,7 +446,7 @@ func newParamDeleteCmd(o *options, component, what string) *cobra.Command {
 				if err := pa.DeleteParameter(ctx, component, name); err != nil {
 					return err
 				}
-				return o.done(cmd, "deleted %s %q", what, name)
+				return o.done(cmd, "Deleted %s %q.", what, name)
 			})
 		},
 	}
