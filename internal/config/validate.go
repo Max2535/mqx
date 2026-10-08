@@ -3,14 +3,9 @@ package config
 import (
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"strings"
 )
-
-// supportedBrokers lists broker types for validation and error messages.
-// ponytail: hard-coded until M1's broker registry becomes the source of truth.
-const supportedBrokers = "kafka, rabbitmq"
 
 var (
 	errInvalidURL     = errors.New("is not a valid URL; check for unescaped characters")
@@ -18,9 +13,18 @@ var (
 	errEmbeddedSecret = errors.New("must not embed a password; remove it and set password_env")
 )
 
+// BrokerValidator checks broker-specific context fields. The broker registry
+// implements it, so this package needs no knowledge of individual brokers.
+type BrokerValidator interface {
+	// Supported lists the known broker types, for error messages.
+	Supported() []string
+	// ValidateContext returns known=false for an unregistered broker type.
+	ValidateContext(c Context) (errs []error, known bool)
+}
+
 // Validate reports every problem in c at once, joined with errors.Join, or nil.
 // It never reads environment variables, so it works without credentials set.
-func (c *Config) Validate() error {
+func (c *Config) Validate(brokers BrokerValidator) error {
 	var errs []error
 	seen := make(map[string]bool, len(c.Contexts))
 	for i, ctx := range c.Contexts {
@@ -33,7 +37,7 @@ func (c *Config) Validate() error {
 			errs = append(errs, fmt.Errorf("%s: duplicate name; context names must be unique", label))
 		}
 		seen[ctx.Name] = true
-		errs = append(errs, ctx.validate(label)...)
+		errs = append(errs, ctx.validate(label, brokers)...)
 	}
 	if c.CurrentContext != "" && !seen[c.CurrentContext] {
 		errs = append(errs, fmt.Errorf("current-context %q does not exist; run `mqx ctx use <name>` with a name from `mqx ctx list`",
@@ -42,32 +46,41 @@ func (c *Config) Validate() error {
 	return errors.Join(errs...)
 }
 
-func (c Context) validate(label string) []error {
+func (c Context) validate(label string, brokers BrokerValidator) []error {
 	var errs []error
-	switch c.Broker {
-	case "":
-		errs = append(errs, fmt.Errorf("%s: broker is required (supported: %s)", label, supportedBrokers))
-	case "kafka":
-		if len(c.Brokers) == 0 {
-			errs = append(errs, fmt.Errorf("%s: kafka needs at least one entry in brokers", label))
+	supported := strings.Join(brokers.Supported(), ", ")
+	if c.Broker == "" {
+		errs = append(errs, fmt.Errorf("%s: broker is required (supported: %s)", label, supported))
+	} else {
+		specific, known := brokers.ValidateContext(c)
+		if !known {
+			errs = append(errs, fmt.Errorf("%s: unknown broker %q (supported: %s)", label, c.Broker, supported))
 		}
-		for i, b := range c.Brokers {
-			// Static message: the entry may embed a credential and must not be echoed.
-			if _, _, err := net.SplitHostPort(b); err != nil || strings.Contains(b, "@") {
-				errs = append(errs, fmt.Errorf("%s: brokers[%d] must be host:port; credentials go in username_env / password_env", label, i))
-			}
+		for _, err := range specific {
+			errs = append(errs, fmt.Errorf("%s: %w", label, err))
 		}
-	case "rabbitmq":
-		if c.URL == "" {
-			errs = append(errs, fmt.Errorf("%s: rabbitmq needs url", label))
-		}
-	default:
-		errs = append(errs, fmt.Errorf("%s: unknown broker %q (supported: %s)", label, c.Broker, supportedBrokers))
 	}
-	for _, f := range []struct{ key, value string }{{"url", c.URL}, {"management_url", c.ManagementURL}} {
+	urls := []struct{ key, value string }{{"url", c.URL}, {"management_url", c.ManagementURL}}
+	for _, ep := range []struct {
+		key string
+		e   *Endpoint
+	}{{"schema_registry", c.SchemaRegistry}, {"connect", c.Connect}, {"ksqldb", c.KSQLDB}} {
+		if ep.e == nil {
+			continue
+		}
+		if ep.e.URL == "" {
+			errs = append(errs, fmt.Errorf("%s: %s.url is required", label, ep.key))
+			continue
+		}
+		urls = append(urls, struct{ key, value string }{ep.key + ".url", ep.e.URL})
+	}
+	for _, f := range urls {
 		if err := checkNoPassword(f.value); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %s %w", label, f.key, err))
 		}
+	}
+	if c.TLS != nil && (c.TLS.CertFile == "") != (c.TLS.KeyFile == "") {
+		errs = append(errs, fmt.Errorf("%s: tls.cert_file and tls.key_file must be set together", label))
 	}
 	return errs
 }
