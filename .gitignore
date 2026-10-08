@@ -7,3 +7,4 @@
 *.test
 *.out
 coverage.*
+.claude/worktrees/

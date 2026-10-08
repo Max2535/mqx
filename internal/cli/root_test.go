@@ -9,7 +9,7 @@ import (
 // run executes a fresh command tree in-process and captures its output.
 func run(t *testing.T, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
-	cmd := NewRootCmd()
+	cmd := NewRootCmd(withTerminal(false))
 	var out, errOut bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errOut)
