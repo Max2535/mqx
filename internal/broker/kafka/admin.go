@@ -14,7 +14,7 @@ import (
 )
 
 // topicPropagation bounds how long CreateTopic waits for the new topic to show in metadata.
-const topicPropagation = 5 * time.Second
+const topicPropagation = 15 * time.Second
 
 // CreateTopic implements broker.TopicAdmin. Zero partitions or replication
 // factor use the broker defaults.
