@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -66,6 +67,13 @@ func loadTopics(ctx context.Context, e *env) (listing, error) {
 	if err != nil {
 		return listing{}, err
 	}
+	// Internal topics (__consumer_offsets, ...) go last; user topics are what people browse.
+	sort.SliceStable(topics, func(i, j int) bool {
+		if topics[i].Internal != topics[j].Internal {
+			return !topics[i].Internal
+		}
+		return topics[i].Name < topics[j].Name
+	})
 	rows := make([]row, len(topics))
 	for i, t := range topics {
 		details := formatKV(t.Details, " ")

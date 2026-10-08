@@ -68,7 +68,7 @@ func newVHostCreateCmd(o *options) *cobra.Command {
 				if err := ua.PutVHost(ctx, v); err != nil {
 					return err
 				}
-				return o.done(cmd, "created vhost %q", v.Name)
+				return o.done(cmd, "Created vhost %q.", v.Name)
 			})
 		},
 	}
@@ -96,7 +96,7 @@ func newVHostDeleteCmd(o *options) *cobra.Command {
 				if err := ua.DeleteVHost(ctx, name); err != nil {
 					return err
 				}
-				return o.done(cmd, "deleted vhost %q", name)
+				return o.done(cmd, "Deleted vhost %q.", name)
 			})
 		},
 	}
