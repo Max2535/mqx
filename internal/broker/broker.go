@@ -91,6 +91,9 @@ type Message struct {
 // SchemaRef identifies a registered schema. On publish, set Subject (and
 // optionally Version) or ID; on peek, adapters fill ID, Format and Subject.
 type SchemaRef struct {
+	// Name is the import name a schema uses for a reference (e.g. a .proto
+	// path); it defaults to Subject.
+	Name    string `json:"name,omitempty"`
 	ID      int    `json:"id,omitempty"`
 	Subject string `json:"subject,omitempty"`
 	Version int    `json:"version,omitempty"`
