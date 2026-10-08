@@ -1,0 +1,63 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+project_name: mqx
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - main: ./cmd/mqx
+    binary: mqx
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w
+      - -X github.com/Max2535/mqx/internal/cli.version={{ .Version }}
+      - -X github.com/Max2535/mqx/internal/cli.commit={{ .FullCommit }}
+      - -X github.com/Max2535/mqx/internal/cli.date={{ .Date }}
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files: [README.md, LICENSE]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Other
+      order: 999
+  filters:
+    exclude: ['^docs:', '^test:', '^ci:', '^chore:']
+
+homebrew_casks:
+  - name: mqx
+    repository:
+      owner: Max2535
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/Max2535/mqx
+    description: Multi-broker message queue TUI/CLI for Kafka and RabbitMQ
+    license: MIT
+    # Publishing needs a Max2535/homebrew-tap repo and a HOMEBREW_TAP_GITHUB_TOKEN
+    # secret; without the token the cask is built but not pushed.
+    skip_upload: '{{ if index .Env "HOMEBREW_TAP_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/mqx"]
+          end
