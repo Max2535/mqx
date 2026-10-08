@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -27,6 +28,8 @@ const literalSecretHint = "credentials must not be stored in the config; " +
 type Config struct {
 	CurrentContext string    `yaml:"current-context"`
 	Contexts       []Context `yaml:"contexts"`
+
+	doc *yaml.Node // the tree Load read, so Save can keep its comments
 }
 
 // Context is one named broker connection.
@@ -100,6 +103,10 @@ func Load(path string) (*Config, error) {
 		}
 		return nil, fmt.Errorf("parse config %q: %w", path, err)
 	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err == nil && len(doc.Content) == 1 && doc.Content[0].Kind == yaml.MappingNode {
+		c.doc = &doc
+	}
 	return &c, nil
 }
 
@@ -124,14 +131,68 @@ func isLiteralSecret(err error) bool {
 
 // Save writes c to path atomically (temp file + rename) with mode 0600,
 // creating the parent directory with mode 0700 if needed.
+//
+// A Config from Load is written back into the file's own YAML tree, which keeps
+// comments, key order and flow style (blank lines are not kept). A file using
+// anchors or aliases cannot be updated that way; it is rewritten from scratch
+// after copying it to path + ".bak".
 func (c *Config) Save(path string) error {
 	if resolved, err := filepath.EvalSymlinks(path); err == nil {
 		path = resolved // write through a symlinked config instead of replacing the link
 	}
-	data, err := yaml.Marshal(c)
+	data, keptComments, err := c.encode()
 	if err != nil {
 		return fmt.Errorf("encode config: %w", err)
 	}
+	if !keptComments {
+		if err := backup(path); err != nil {
+			return err
+		}
+	}
+	return writeAtomic(path, data)
+}
+
+// encode renders c, merged into its loaded tree when possible. keptComments is
+// false only when a loaded tree had to be discarded.
+func (c *Config) encode() (data []byte, keptComments bool, err error) {
+	var fresh yaml.Node
+	if err := fresh.Encode(c); err != nil {
+		return nil, false, err
+	}
+	doc := &yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{&fresh}}
+	keptComments = c.doc == nil
+	if c.doc != nil && mergeable(c.doc) {
+		mergeNode(c.doc.Content[0], &fresh)
+		doc, keptComments = c.doc, true
+	}
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(doc); err != nil {
+		return nil, false, err
+	}
+	if err := enc.Close(); err != nil {
+		return nil, false, err
+	}
+	return buf.Bytes(), keptComments, nil
+}
+
+// backup copies an existing file at path to path + ".bak" with mode 0600.
+func backup(path string) error {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("back up config %q: %w", path, err)
+	}
+	if err := writeAtomic(path+".bak", data); err != nil {
+		return fmt.Errorf("back up config %q: %w", path, err)
+	}
+	return nil
+}
+
+func writeAtomic(path string, data []byte) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create config dir %q: %w", dir, err)
