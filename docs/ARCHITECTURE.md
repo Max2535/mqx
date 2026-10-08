@@ -91,7 +91,10 @@ Adapters never check `read_only`. Every mutating action passes one guard:
   contexts, then requires `--yes` or an interactive `[y/N]` on a terminal. A
   non-terminal without `--yes` is refused, so scripts never block.
 - TUI: mutating actions are hidden on `read_only` contexts; elsewhere each opens
-  a confirm dialog whose default is Cancel.
+  a confirm dialog whose default is Cancel. An action can declare a `danger`
+  (publishing to an internal topic) that makes the dialog ask for the name to be
+  typed. The command palette runs actions by sending their keys, so it cannot
+  bypass the guard.
 
 Publishing is treated as mutating.
 

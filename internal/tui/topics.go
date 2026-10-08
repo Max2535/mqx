@@ -50,7 +50,15 @@ func newTopicsPanel(e *env, focus string) panel {
 		focusKind: e.kind(),
 		focusOpen: browse,
 		onSelect:  func(r row) { e.topic = r.key },
-		actions:   actions,
+		loaded: func(l listing) {
+			e.internal = map[string]bool{}
+			for _, r := range l.rows {
+				if t, ok := r.data.(broker.Topic); ok && t.Internal {
+					e.internal[t.Name] = true
+				}
+			}
+		},
+		actions: actions,
 	})
 	return newStack(lv)
 }

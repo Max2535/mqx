@@ -197,3 +197,18 @@ func TestPublishRefusedOnReadOnly(t *testing.T) {
 		t.Errorf("calls = %v", e.f.Calls)
 	}
 }
+
+func TestPublishRefusesInternalTopics(t *testing.T) {
+	e := newFakeEnv(t, false)
+	e.f.AddTopic("__consumer_offsets", 1)
+	_, _, err := e.run(t, "publish", "__consumer_offsets", "--value", "x", "--yes")
+	checkErr(t, err, "--allow-internal")
+	if len(e.f.Calls) != 0 {
+		t.Errorf("calls = %v", e.f.Calls)
+	}
+	_, _, err = e.run(t, "publish", "__consumer_offsets", "--value", "x", "--yes", "--allow-internal")
+	checkErr(t, err, "")
+	if len(e.f.Calls) != 1 {
+		t.Errorf("calls = %v", e.f.Calls)
+	}
+}
