@@ -95,6 +95,17 @@ func TestValidate(t *testing.T) {
 			secret: "s3cret",
 		},
 		{
+			name:   "kafka broker with credentials",
+			cfg:    Config{Contexts: []Context{{Name: "a", Broker: "kafka", Brokers: []string{"localhost:9092", "user:s3cret@host:9092"}}}},
+			want:   []string{`context "a": brokers[1] must be host:port; credentials go in username_env / password_env`},
+			secret: "s3cret",
+		},
+		{
+			name: "kafka broker without port",
+			cfg:  Config{Contexts: []Context{{Name: "a", Broker: "kafka", Brokers: []string{"localhost"}}}},
+			want: []string{`context "a": brokers[0] must be host:port`},
+		},
+		{
 			name: "unknown current context",
 			cfg:  Config{CurrentContext: "gone", Contexts: []Context{kafkaCtx("a")}},
 			want: []string{`current-context "gone" does not exist`},

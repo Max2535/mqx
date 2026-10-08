@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -63,12 +64,27 @@ func Load(path string) (*Config, error) {
 	dec.KnownFields(true) // unknown keys, including literal password/username, are errors
 	var c Config
 	if err := dec.Decode(&c); err != nil && !errors.Is(err, io.EOF) {
+		var typeErr *yaml.TypeError
+		if errors.As(err, &typeErr) {
+			err = &yaml.TypeError{Errors: redactQuoted(typeErr.Errors)}
+		}
 		if isLiteralSecret(err) {
 			return nil, fmt.Errorf("parse config %q: %w (%s)", path, err, literalSecretHint)
 		}
 		return nil, fmt.Errorf("parse config %q: %w", path, err)
 	}
 	return &c, nil
+}
+
+var quotedValue = regexp.MustCompile("`[^`]*`")
+
+// redactQuoted hides the backtick-quoted offending values yaml.v3 puts in type errors.
+func redactQuoted(msgs []string) []string {
+	out := make([]string, len(msgs))
+	for i, m := range msgs {
+		out[i] = quotedValue.ReplaceAllString(m, "<value>")
+	}
+	return out
 }
 
 // isLiteralSecret reports whether a decode error comes from a literal credential key.
@@ -82,6 +98,9 @@ func isLiteralSecret(err error) bool {
 // Save writes c to path atomically (temp file + rename) with mode 0600,
 // creating the parent directory with mode 0700 if needed.
 func (c *Config) Save(path string) error {
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		path = resolved // write through a symlinked config instead of replacing the link
+	}
 	data, err := yaml.Marshal(c)
 	if err != nil {
 		return fmt.Errorf("encode config: %w", err)

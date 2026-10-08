@@ -71,6 +71,24 @@ func TestCtxList(t *testing.T) {
 			},
 			wantErr: "must be an absolute URL with a host",
 		},
+		{
+			name:    "kafka broker credentials are redacted",
+			content: "contexts:\n  - name: k\n    broker: kafka\n    brokers: [\"user:s3cret@host:9092\"]\n",
+			wantLines: [][]string{
+				{"CURRENT", "NAME", "BROKER", "MODE", "ENDPOINT"},
+				{"k", "kafka", "rw", "<redacted>"},
+			},
+			wantErr: "must be host:port",
+		},
+		{
+			name:    "kafka without brokers has empty endpoint",
+			content: "contexts:\n  - name: k\n    broker: kafka\n",
+			wantLines: [][]string{
+				{"CURRENT", "NAME", "BROKER", "MODE", "ENDPOINT"},
+				{"k", "kafka", "rw"},
+			},
+			wantErr: "kafka needs at least one entry",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
