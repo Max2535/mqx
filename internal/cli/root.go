@@ -34,7 +34,7 @@ func NewRootCmd() *cobra.Command {
 	}
 	root.PersistentFlags().StringVar(&opts.configPath, "config", "",
 		"config file (default $MQX_CONFIG, then ~/.config/mqx/config.yaml)")
-	root.AddCommand(newVersionCmd())
+	root.AddCommand(newVersionCmd(), newCtxCmd(opts))
 	return root
 }
 
