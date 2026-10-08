@@ -104,6 +104,33 @@ func waitStable(t *testing.T, b broker.Broker, group string, n int) {
 	t.Fatalf("group %s not Stable with %d members: %+v, %v", group, n, d, err)
 }
 
+// waitAssigned waits until the group's members hold n partitions in total.
+// Under the consumer protocol (KIP-848) a group reports Stable before members
+// have reconciled their assignments, so Stable alone is not enough.
+func waitAssigned(t *testing.T, b broker.Broker, group string, n int) {
+	t.Helper()
+	gi := b.(broker.GroupInspector)
+	deadline := time.Now().Add(60 * time.Second)
+	var d *broker.GroupDescription
+	var err error
+	for time.Now().Before(deadline) {
+		d, err = gi.DescribeGroup(ctxT(t), group)
+		if err == nil {
+			got := 0
+			for _, m := range d.Members {
+				for _, tp := range m.Assignment {
+					got += len(tp.Partitions)
+				}
+			}
+			if got == n {
+				return
+			}
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	t.Fatalf("group %s members do not hold %d partitions: %+v, %v", group, n, d, err)
+}
+
 func findRule(fs []Finding, rule string) (Finding, bool) {
 	i := slices.IndexFunc(fs, func(f Finding) bool { return f.Rule == rule })
 	if i < 0 {
@@ -183,6 +210,7 @@ func TestDiagnoseMoreMembersThanPartitions(t *testing.T) {
 				startMember(t, group, []string{topic}, tt.opts...)
 			}
 			waitStable(t, b, group, 3)
+			waitAssigned(t, b, group, 1)
 			f, ok := findRule(Diagnose([]Snapshot{collect(t, b, group)}), RuleMoreMembers)
 			if !ok {
 				t.Fatal("no more-members-than-partitions finding")
