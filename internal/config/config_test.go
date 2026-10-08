@@ -159,3 +159,39 @@ func TestDefaultPath(t *testing.T) {
 		})
 	}
 }
+
+func TestUse(t *testing.T) {
+	tests := []struct {
+		name        string
+		cfg         Config
+		use         string
+		wantCurrent string
+		wantErr     string
+	}{
+		{name: "switch", cfg: Config{CurrentContext: "a", Contexts: []Context{kafkaCtx("a"), kafkaCtx("b")}}, use: "b", wantCurrent: "b"},
+		{name: "same context", cfg: Config{CurrentContext: "a", Contexts: []Context{kafkaCtx("a")}}, use: "a", wantCurrent: "a"},
+		{
+			name:        "unknown name lists available",
+			cfg:         Config{CurrentContext: "a", Contexts: []Context{kafkaCtx("a"), kafkaCtx("b")}},
+			use:         "zzz",
+			wantCurrent: "a",
+			wantErr:     `context "zzz" not found; available: a, b`,
+		},
+		{name: "no contexts", cfg: Config{}, use: "a", wantErr: `context "a" not found; no contexts defined in config`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cfg.Use(tt.use)
+			if tt.wantErr != "" {
+				if err == nil || err.Error() != tt.wantErr {
+					t.Fatalf("Use() error = %v, want %q", err, tt.wantErr)
+				}
+			} else if err != nil {
+				t.Fatalf("Use() unexpected error: %v", err)
+			}
+			if tt.cfg.CurrentContext != tt.wantCurrent {
+				t.Errorf("CurrentContext = %q, want %q", tt.cfg.CurrentContext, tt.wantCurrent)
+			}
+		})
+	}
+}
