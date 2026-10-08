@@ -52,7 +52,9 @@ func IsKSQLQuery(stmt string) bool {
 // a header object followed by one JSON array per row.
 func (k *Kafka) ksqlQuery(ctx context.Context, stmt string) (*broker.KSQLResult, error) {
 	c := k.ksql
-	data, err := json.Marshal(map[string]any{"sql": stmt, "properties": map[string]any{}})
+	// Read from the earliest offset, like a peek, so existing rows show up.
+	props := map[string]any{"ksql.streams.auto.offset.reset": "earliest"}
+	data, err := json.Marshal(map[string]any{"sql": stmt, "properties": props})
 	if err != nil {
 		return nil, fmt.Errorf("encode ksql query: %w", err)
 	}
