@@ -30,6 +30,11 @@ type env struct {
 	// topic is the topic or queue last selected in the Topics panel; the
 	// Consumers and Metrics panels follow it.
 	topic string
+	// internal names the topics the broker reported as internal in the last
+	// Topics listing; publishing to one needs the name typed to confirm.
+	internal map[string]bool
+	// history keeps form submissions across contexts.
+	history *formHistory
 	// spin is the current spinner frame, updated by the root model.
 	spin string
 }
@@ -117,23 +122,26 @@ func (e *env) mut(b key.Binding) key.Binding {
 	return b
 }
 
-// confirmMsg asks the root model to show a confirm dialog and run run on confirmation.
+// confirmMsg asks the root model to show a confirm dialog and run run on
+// confirmation. With typed set, the user must type it instead of pressing y.
 type confirmMsg struct {
 	prompt string
 	detail string
+	typed  string
 	run    tea.Cmd
 }
 
 // mutate is the TUI's single mutation gate. It refuses read_only contexts
-// and otherwise asks for confirmation before running fn. Adapters never check
-// read_only themselves.
-func (e *env) mutate(to int, action, detail string, fn func(ctx context.Context) tea.Msg) tea.Cmd {
+// and otherwise asks for confirmation before running fn; typed, when set,
+// must be typed to confirm. Adapters never check read_only themselves.
+func (e *env) mutate(to int, action, detail, typed string, fn func(ctx context.Context) tea.Msg) tea.Cmd {
 	if e.ctx.ReadOnly {
 		return statusErr(fmt.Errorf("refusing to %s: context %q is read_only", lowerFirst(action), e.ctx.Name))
 	}
 	msg := confirmMsg{
 		prompt: fmt.Sprintf("%s on %s?", action, e.ctx.Name),
 		detail: detail,
+		typed:  typed,
 		run:    e.call(to, fn),
 	}
 	return func() tea.Msg { return msg }

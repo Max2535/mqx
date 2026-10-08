@@ -30,7 +30,7 @@ func publishFields(e *env) []field {
 		fields = append(fields, field{key: "partition", label: "Partition", hint: "empty = partitioner picks"})
 	}
 	return append(fields,
-		field{key: "headers", label: "Headers (k=v per line)", kind: fieldArea},
+		field{key: "headers", label: "Headers (k=v per line, or JSON)", kind: fieldArea},
 		field{key: "json", label: "Validate JSON", hint: "y/N"},
 		field{key: "payload", label: "Payload", kind: fieldArea},
 	)
@@ -85,6 +85,13 @@ func publishAction(e *env, topic func(r *row) string, needsRow bool) action {
 		check: func(_ *row, v values) error {
 			_, err := buildMessage(v)
 			return err
+		},
+		danger: func(r *row, v values) (string, string) {
+			if t := topic(r); v["exchange"] == "" && e.internal[t] {
+				return fmt.Sprintf("%s is an internal %s that the broker manages itself. "+
+					"Writing to it can corrupt cluster state, e.g. the transaction coordinator or committed offsets.", t, e.kind()), t
+			}
+			return "", ""
 		},
 		describe: func(r *row, v values) string {
 			what := fmt.Sprintf("Publish %d bytes to %s %s", len(v["payload"]), e.kind(), topic(r))

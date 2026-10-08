@@ -28,6 +28,7 @@ type publishFlags struct {
 	schema       string
 	schemaVer    int
 	schemaID     int
+	internal     bool
 	schemaForKey bool
 }
 
@@ -58,6 +59,8 @@ needs confirmation (--yes when not on a terminal).`,
 				target := args[0]
 				if pf.exchange != "" {
 					target = fmt.Sprintf("exchange %s (routing key %q)", pf.exchange, msgs[0].RoutingKey)
+				} else if err := refuseInternal(ctx, s.b, target, pf.internal); err != nil {
+					return err
 				}
 				if err := s.guard(cmd, fmt.Sprintf("publish %d message(s) to %s", len(msgs), target)); err != nil {
 					return err
@@ -87,7 +90,23 @@ needs confirmation (--yes when not on a terminal).`,
 	f.IntVar(&pf.schemaVer, "schema-version", 0, "Kafka: subject version (default latest)")
 	f.IntVar(&pf.schemaID, "schema-id", 0, "Kafka: encode with this schema id instead of a subject")
 	f.BoolVar(&pf.schemaForKey, "schema-key", false, "Kafka: apply the schema to the key instead of the value")
+	f.BoolVar(&pf.internal, "allow-internal", false, "allow publishing to a topic the broker marks internal, such as __consumer_offsets")
 	return cmd
+}
+
+// refuseInternal stops a publish to a topic the broker reports as internal
+// unless allow is set. Brokers that cannot describe topics are not checked.
+func refuseInternal(ctx context.Context, b broker.Broker, topic string, allow bool) error {
+	d, ok := b.(broker.TopicDescriber)
+	if !ok || allow {
+		return nil
+	}
+	detail, err := d.DescribeTopic(ctx, topic)
+	if err != nil || detail == nil || !detail.Topic.Internal {
+		return nil // a missing topic is reported by Publish itself
+	}
+	return fmt.Errorf("%s is an internal topic that the broker manages itself; writing to it can corrupt "+
+		"cluster state such as transactions or committed offsets. Pass --allow-internal if you really mean it", topic)
 }
 
 func (pf publishFlags) messages(in io.Reader) ([]broker.Message, error) {

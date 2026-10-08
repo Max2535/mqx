@@ -124,7 +124,7 @@ func keyMsg(n string) tea.KeyMsg {
 	special := map[string]tea.KeyType{
 		"enter": tea.KeyEnter, "esc": tea.KeyEsc, "tab": tea.KeyTab, "shift+tab": tea.KeyShiftTab,
 		"up": tea.KeyUp, "down": tea.KeyDown, "left": tea.KeyLeft, "right": tea.KeyRight,
-		"ctrl+s": tea.KeyCtrlS, "ctrl+c": tea.KeyCtrlC, "backspace": tea.KeyBackspace,
+		"ctrl+s": tea.KeyCtrlS, "ctrl+c": tea.KeyCtrlC, "ctrl+r": tea.KeyCtrlR, "backspace": tea.KeyBackspace,
 	}
 	if t, ok := special[n]; ok {
 		return tea.KeyMsg{Type: t}

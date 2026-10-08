@@ -3,21 +3,35 @@ package tui
 import (
 	"strings"
 
+	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 // confirmDialog asks before a mutating action. Focus starts on Cancel, so a
-// stray enter never mutates; y confirms, n or esc cancels.
+// stray enter never mutates; y confirms, n or esc cancels. A dangerous action
+// sets typed: then only typing it and pressing enter confirms.
 type confirmDialog struct {
 	prompt    string
 	detail    string
 	run       tea.Cmd
 	onConfirm bool // focus on [Confirm]
+	typed     string
+	input     textinput.Model
+	mismatch  bool
 }
 
 func newConfirm(m confirmMsg) *confirmDialog {
-	return &confirmDialog{prompt: m.prompt, detail: m.detail, run: m.run}
+	d := &confirmDialog{prompt: m.prompt, detail: m.detail, run: m.run, typed: m.typed}
+	if d.typed != "" {
+		d.input = textinput.New()
+		d.input.Prompt = "> "
+		d.input.CharLimit = 0
+		_ = d.input.Cursor.SetMode(cursor.CursorStatic)
+		d.input.Focus()
+	}
+	return d
 }
 
 // Update implements overlay.
@@ -25,6 +39,9 @@ func (d *confirmDialog) Update(msg tea.Msg) (overlay, tea.Cmd) {
 	km, ok := msg.(tea.KeyMsg)
 	if !ok {
 		return d, nil
+	}
+	if d.typed != "" {
+		return d.updateTyped(km)
 	}
 	switch km.String() {
 	case "y", "Y":
@@ -42,6 +59,23 @@ func (d *confirmDialog) Update(msg tea.Msg) (overlay, tea.Cmd) {
 	return d, nil
 }
 
+func (d *confirmDialog) updateTyped(km tea.KeyMsg) (overlay, tea.Cmd) {
+	switch km.String() {
+	case "esc":
+		return nil, statusInfo("cancelled")
+	case "enter":
+		if d.input.Value() == d.typed {
+			return nil, d.run
+		}
+		d.mismatch = true
+		return d, nil
+	}
+	var cmd tea.Cmd
+	d.input, cmd = d.input.Update(km)
+	d.mismatch = false
+	return d, cmd
+}
+
 // View implements overlay.
 func (d *confirmDialog) View(width, height int) string {
 	inner := min(max(40, width-10), 90)
@@ -49,6 +83,14 @@ func (d *confirmDialog) View(width, height int) string {
 	b.WriteString(st.warn.Render(wrap(d.prompt, inner)) + "\n")
 	if d.detail != "" {
 		b.WriteString("\n" + clipLines(d.detail, inner, max(3, height-12)) + "\n")
+	}
+	if d.typed != "" {
+		b.WriteString("\nType " + st.navActive.Render(d.typed) + " to confirm:\n" + d.input.View() + "\n")
+		if d.mismatch {
+			b.WriteString(st.err.Render("does not match") + "\n")
+		}
+		b.WriteString("\n" + st.muted.Render("enter confirm • esc cancel"))
+		return st.dialog.Render(b.String())
 	}
 	cancel, confirm := st.button.Render("Cancel"), st.button.Render("Confirm")
 	if d.onConfirm {

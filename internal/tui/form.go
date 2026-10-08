@@ -38,7 +38,8 @@ type field struct {
 type values map[string]string
 
 // form is an overlay of labelled inputs. Enter moves to the next single-line
-// field and submits on the last one; ctrl+s submits from anywhere; esc cancels.
+// field and submits on the last one; ctrl+s submits from anywhere; esc cancels;
+// ctrl+r steps back through earlier submissions of the same form.
 // submit validates and returns the command to run; an error keeps the form open.
 type form struct {
 	title  string
@@ -49,6 +50,9 @@ type form struct {
 	focus  int
 	err    string
 	submit func(values) (tea.Cmd, error)
+
+	history *formHistory
+	recall  int // next history entry ctrl+r restores
 }
 
 func newForm(title string, fields []field, submit func(values) (tea.Cmd, error)) *form {
@@ -89,6 +93,48 @@ func newForm(title string, fields []field, submit func(values) (tea.Cmd, error))
 	}
 	f.setFocus(0)
 	return f
+}
+
+// remember makes the form save valid submissions to h and offer them with ctrl+r.
+func (f *form) remember(h *formHistory) *form {
+	f.history = h
+	return f
+}
+
+// restore fills the fields from v, leaving secrets and unknown keys alone.
+func (f *form) restore(v values) {
+	for i, fd := range f.fields {
+		val, ok := v[fd.key]
+		if !ok {
+			continue
+		}
+		switch fd.kind {
+		case fieldSecret:
+		case fieldBool:
+			f.picks[i] = 0
+			if val == "true" {
+				f.picks[i] = 1
+			}
+		case fieldChoice:
+			f.picks[i] = max(0, slices.Index(fd.choices, val))
+		case fieldArea:
+			f.areas[i].SetValue(val)
+		default:
+			f.inputs[i].SetValue(val)
+			f.inputs[i].CursorEnd()
+		}
+	}
+}
+
+// storable returns v without secret fields, for the history.
+func (f *form) storable(v values) values {
+	out := values{}
+	for _, fd := range f.fields {
+		if fd.kind != fieldSecret {
+			out[fd.key] = v[fd.key]
+		}
+	}
+	return out
 }
 
 func (f *form) setFocus(i int) {
@@ -148,6 +194,13 @@ func (f *form) Update(msg tea.Msg) (overlay, tea.Cmd) {
 		return nil, statusInfo("cancelled")
 	case "ctrl+s":
 		return f.doSubmit()
+	case "ctrl+r":
+		if entries := f.history.get(f.title); len(entries) > 0 {
+			f.restore(entries[f.recall%len(entries)])
+			f.recall++
+			f.err = ""
+		}
+		return f, nil
 	case "tab", "down":
 		if km.String() == "tab" || !area {
 			f.setFocus(f.focus + 1)
@@ -202,11 +255,13 @@ func (f *form) pick(k string) bool {
 }
 
 func (f *form) doSubmit() (overlay, tea.Cmd) {
-	cmd, err := f.submit(f.values())
+	v := f.values()
+	cmd, err := f.submit(v)
 	if err != nil {
 		f.err = err.Error()
 		return f, nil
 	}
+	f.history.add(f.title, f.storable(v))
 	return nil, cmd
 }
 
@@ -255,6 +310,9 @@ func (f *form) View(width, height int) string {
 		b.WriteString("\n" + st.err.Render(wrap(f.err, inner)) + "\n")
 	}
 	keys := "tab next • enter next/submit • ctrl+s submit • esc cancel"
+	if n := len(f.history.get(f.title)); n > 0 {
+		keys = fmt.Sprintf("ctrl+r previous (%d/%d) • ", f.recall%n+1, n) + keys
+	}
 	if onPick {
 		keys = "←/→/space change • " + keys
 	}

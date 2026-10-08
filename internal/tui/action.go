@@ -33,6 +33,9 @@ type action struct {
 	check func(r *row, v values) error
 	// describe names the action for the confirm dialog and status bar: "Delete topic orders".
 	describe func(r *row, v values) string
+	// danger, when it returns a warning, shows it in the confirm dialog and
+	// makes the user type word instead of pressing y.
+	danger func(r *row, v values) (warning, word string)
 	// preview runs before the confirm dialog (e.g. an offset-reset dry run).
 	preview func(ctx context.Context, r *row, v values) (string, error)
 	run     func(ctx context.Context, r *row, v values) (string, error)
@@ -104,7 +107,7 @@ func startAction(e *env, id int, a action, r *row) tea.Cmd {
 			}
 		}
 		return execAction(e, id, a, r, v), nil
-	}))
+	}).remember(e.history))
 }
 
 func execAction(e *env, id int, a action, r *row, v values) tea.Cmd {
@@ -126,7 +129,14 @@ func execAction(e *env, id int, a action, r *row, v values) tea.Cmd {
 
 func guarded(e *env, id int, a action, r *row, v values, detail string) tea.Cmd {
 	what := a.what(r, v)
-	return e.mutate(id, what, detail, func(ctx context.Context) tea.Msg {
+	var word string
+	if a.danger != nil {
+		var warning string
+		if warning, word = a.danger(r, v); warning != "" {
+			detail = strings.TrimSpace("⚠ " + warning + "\n\n" + detail)
+		}
+	}
+	return e.mutate(id, what, detail, word, func(ctx context.Context) tea.Msg {
 		out, err := a.run(ctx, r, v)
 		return actionDoneMsg{what: what, out: out, err: err, mutated: true}
 	})
