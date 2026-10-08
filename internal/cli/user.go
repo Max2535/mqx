@@ -82,7 +82,7 @@ without echo on a terminal. It is never accepted as a flag value.`,
 				if err := ua.PutUser(ctx, broker.User{Name: name, Tags: nonNilList(tags)}, password); err != nil {
 					return err
 				}
-				return o.done(cmd, "created user %q", name)
+				return o.done(cmd, "Created user %q.", name)
 			})
 		},
 	}
@@ -171,7 +171,7 @@ func newUserDeleteCmd(o *options) *cobra.Command {
 				if err := ua.DeleteUser(ctx, name); err != nil {
 					return err
 				}
-				return o.done(cmd, "deleted user %q", name)
+				return o.done(cmd, "Deleted user %q.", name)
 			})
 		},
 	}
@@ -197,7 +197,7 @@ func newUserSetTagsCmd(o *options) *cobra.Command {
 				if err := ua.PutUser(ctx, u, ""); err != nil {
 					return err
 				}
-				return o.done(cmd, "set tags of user %q to [%s]", u.Name, strings.Join(u.Tags, ","))
+				return o.done(cmd, "Set tags of user %q to [%s].", u.Name, strings.Join(u.Tags, ","))
 			})
 		},
 	}
@@ -282,7 +282,7 @@ permission is a regex over resource names; an empty regex grants nothing.`,
 				if err := ua.SetPermission(ctx, p); err != nil {
 					return err
 				}
-				return o.done(cmd, "set permissions of user %q on vhost %s", p.User, vhostLabel(p.VHost))
+				return o.done(cmd, "Set permissions of user %q on vhost %s.", p.User, vhostLabel(p.VHost))
 			})
 		},
 	}
@@ -321,7 +321,7 @@ func newPermissionClearCmd(o *options) *cobra.Command {
 				if err := ua.ClearPermission(ctx, user, vhost); err != nil {
 					return err
 				}
-				return o.done(cmd, "cleared permissions of user %q on vhost %s", user, vhostLabel(vhost))
+				return o.done(cmd, "Cleared permissions of user %q on vhost %s.", user, vhostLabel(vhost))
 			})
 		},
 	}

@@ -68,7 +68,7 @@ or "mqx consumers <queue>".`,
 				if err := ct.TerminateConsumer(ctx, broker.ConsumerTarget{Connection: name, Reason: reason}); err != nil {
 					return err
 				}
-				return o.done(cmd, "closed connection %q", name)
+				return o.done(cmd, "Closed connection %q.", name)
 			})
 		},
 	}

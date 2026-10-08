@@ -91,7 +91,7 @@ func (o *options) writeRates(cmd *cobra.Command, first bool, prev, cur broker.Me
 	}
 	rates, gauges := sortedKeys(line.Rates), sortedKeys(line.Gauges)
 	if first {
-		hdr := "TIME"
+		hdr := fmt.Sprintf("%-8s", "TIME")
 		for _, k := range rates {
 			hdr += fmt.Sprintf("  %14s", k+"/s")
 		}
