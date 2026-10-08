@@ -105,7 +105,17 @@ func printContexts(w io.Writer, cfg *config.Config) error {
 // list runs before validation and must never print a secret.
 func endpoint(c config.Context) string {
 	if len(c.Brokers) > 0 {
-		return strings.Join(c.Brokers, ",")
+		shown := make([]string, len(c.Brokers))
+		for i, b := range c.Brokers {
+			shown[i] = b
+			if strings.Contains(b, "@") {
+				shown[i] = "<redacted>"
+			}
+		}
+		return strings.Join(shown, ",")
+	}
+	if c.URL == "" {
+		return ""
 	}
 	u, err := url.Parse(c.URL)
 	if err != nil || u.Host == "" {

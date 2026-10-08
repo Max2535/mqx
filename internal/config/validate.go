@@ -3,7 +3,9 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
+	"strings"
 )
 
 // supportedBrokers lists broker types for validation and error messages.
@@ -48,6 +50,12 @@ func (c Context) validate(label string) []error {
 	case "kafka":
 		if len(c.Brokers) == 0 {
 			errs = append(errs, fmt.Errorf("%s: kafka needs at least one entry in brokers", label))
+		}
+		for i, b := range c.Brokers {
+			// Static message: the entry may embed a credential and must not be echoed.
+			if _, _, err := net.SplitHostPort(b); err != nil || strings.Contains(b, "@") {
+				errs = append(errs, fmt.Errorf("%s: brokers[%d] must be host:port; credentials go in username_env / password_env", label, i))
+			}
 		}
 	case "rabbitmq":
 		if c.URL == "" {

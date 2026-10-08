@@ -62,6 +62,7 @@ contexts:
 		{name: "literal password", content: "contexts:\n  - name: a\n    password: hunter2\n", wantErr: "password_env"},
 		{name: "literal username", content: "contexts:\n  - name: a\n    username: hunter2\n", wantErr: "username_env"},
 		{name: "read_only not a bool", content: "contexts:\n  - name: a\n    read_only: maybe\n", wantErr: "cannot unmarshal"},
+		{name: "type error does not echo value", content: "contexts:\n  - name: a\n    read_only: s3cret\n", wantErr: "cannot unmarshal"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -80,8 +81,10 @@ contexts:
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 					t.Fatalf("Load() error = %v, want containing %q", err, tt.wantErr)
 				}
-				if strings.Contains(err.Error(), "hunter2") {
-					t.Errorf("Load() error leaks the literal value: %v", err)
+				for _, secret := range []string{"hunter2", "s3cret"} {
+					if strings.Contains(err.Error(), secret) {
+						t.Errorf("Load() error leaks the literal value: %v", err)
+					}
 				}
 				return
 			}
@@ -193,5 +196,28 @@ func TestUse(t *testing.T) {
 				t.Errorf("CurrentContext = %q, want %q", tt.cfg.CurrentContext, tt.wantCurrent)
 			}
 		})
+	}
+}
+
+func TestSaveThroughSymlink(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "real.yaml")
+	link := filepath.Join(dir, "link.yaml")
+	if err := os.WriteFile(target, []byte("contexts: []\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("cannot create symlink: %v", err)
+	}
+	cfg := &Config{CurrentContext: "a", Contexts: []Context{{Name: "a", Broker: "kafka", Brokers: []string{"h:9092"}}}}
+	if err := cfg.Save(link); err != nil {
+		t.Fatalf("Save() error: %v", err)
+	}
+	if fi, err := os.Lstat(link); err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("link is no longer a symlink: %v, %v", fi, err)
+	}
+	got, err := Load(target)
+	if err != nil || got.CurrentContext != "a" {
+		t.Errorf("target not updated: %+v, %v", got, err)
 	}
 }
