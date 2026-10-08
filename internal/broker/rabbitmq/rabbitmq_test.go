@@ -296,6 +296,10 @@ func TestMgmtErrors(t *testing.T) {
 	if _, err := r.LinkStatus(ctx, LinkShovel); err == nil || !strings.Contains(err.Error(), "rabbitmq_shovel_management") {
 		t.Errorf("shovel 404 hint missing: %v", err)
 	}
+	f.status("GET /api/federation-links/%2F", http.StatusBadRequest, "") // RabbitMQ 4.x without the plugin
+	if _, err := r.LinkStatus(ctx, LinkFederation); err == nil || !strings.Contains(err.Error(), "rabbitmq_federation_management") {
+		t.Errorf("federation 400 hint missing: %v", err)
+	}
 	if err := r.AlterTopicConfig(ctx, "q", nil); !errors.Is(err, broker.ErrUnsupported) {
 		t.Errorf("AlterTopicConfig = %v", err)
 	}
