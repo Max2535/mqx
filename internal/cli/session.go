@@ -124,14 +124,20 @@ func (o *options) guard(cmd *cobra.Command, c config.Context, action string) err
 		return fmt.Errorf("refusing to %s: context %q is read_only; use a writable context with --context: %w",
 			action, c.Name, ErrReadOnly)
 	}
+	return o.confirm(cmd, action, fmt.Sprintf("%s on context %q", action, c.Name),
+		fmt.Sprintf("About to %s on context %q (%s).", action, c.Name, c.Broker))
+}
+
+// confirm passes with --yes, asks prompt + [y/N] on a terminal, and otherwise
+// refuses, so scripts fail instead of blocking. what describes the action in errors.
+func (o *options) confirm(cmd *cobra.Command, action, what, prompt string) error {
 	if o.yes {
 		return nil
 	}
 	if !o.isTerminal() {
-		return fmt.Errorf("refusing to %s on context %q without confirmation; re-run with --yes: %w",
-			action, c.Name, ErrNotConfirmed)
+		return fmt.Errorf("refusing to %s without confirmation; re-run with --yes: %w", what, ErrNotConfirmed)
 	}
-	fmt.Fprintf(cmd.ErrOrStderr(), "About to %s on context %q (%s). Continue? [y/N] ", action, c.Name, c.Broker)
+	fmt.Fprintf(cmd.ErrOrStderr(), "%s Continue? [y/N] ", prompt)
 	line, err := bufio.NewReader(stdin(cmd)).ReadString('\n')
 	if err != nil && line == "" {
 		return fmt.Errorf("read confirmation: %w", ErrNotConfirmed)
