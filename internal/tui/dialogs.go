@@ -5,8 +5,6 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
-
-	"github.com/Max2535/mqx/internal/config"
 )
 
 // confirmDialog asks before a mutating action. Focus starts on Cancel, so a
@@ -61,66 +59,6 @@ func (d *confirmDialog) View(width, height int) string {
 	b.WriteString("\n" + cancel + "  " + confirm + "\n")
 	b.WriteString(st.muted.Render("←/→ choose • enter select • y confirm • n/esc cancel"))
 	return st.dialog.Render(b.String())
-}
-
-// switchContextMsg asks the root model to open another context.
-type switchContextMsg struct{ name string }
-
-// contextSwitcher lists the config's contexts.
-type contextSwitcher struct {
-	contexts []config.Context
-	current  string
-	t        *table
-}
-
-func newContextSwitcher(contexts []config.Context, current string) *contextSwitcher {
-	t := newTable("", "NAME", "BROKER", "MODE")
-	rows := make([][]string, len(contexts))
-	sel := 0
-	for i, c := range contexts {
-		mark, mode := "", "read-write"
-		if c.Name == current {
-			mark, sel = "*", i
-		}
-		if c.ReadOnly {
-			mode = "read-only"
-		}
-		rows[i] = []string{mark, c.Name, c.Broker, mode}
-	}
-	t.setRows(rows)
-	t.selectRow(sel)
-	return &contextSwitcher{contexts: contexts, current: current, t: t}
-}
-
-// Update implements overlay.
-func (s *contextSwitcher) Update(msg tea.Msg) (overlay, tea.Cmd) {
-	km, ok := msg.(tea.KeyMsg)
-	if !ok {
-		return s, nil
-	}
-	if !s.t.capturing() {
-		switch km.String() {
-		case "esc", "q", "c":
-			return nil, nil
-		case "enter":
-			i := s.t.selected()
-			if i < 0 {
-				return s, nil
-			}
-			name := s.contexts[i].Name
-			return nil, func() tea.Msg { return switchContextMsg{name: name} }
-		}
-	}
-	_, cmd := s.t.update(km)
-	return s, cmd
-}
-
-// View implements overlay.
-func (s *contextSwitcher) View(width, height int) string {
-	w := min(max(40, width-10), 80)
-	body := s.t.view(w, min(len(s.contexts)+1, max(3, height-8)))
-	return st.dialog.Render(st.title.Render("Switch context") + "\n\n" + body + "\n\n" +
-		st.muted.Render("enter switch • / filter • esc close"))
 }
 
 // helpOverlay shows every binding of the root and the active panel.

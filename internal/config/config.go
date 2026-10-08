@@ -29,7 +29,8 @@ type Config struct {
 	CurrentContext string    `yaml:"current-context"`
 	Contexts       []Context `yaml:"contexts"`
 
-	doc *yaml.Node // the tree Load read, so Save can keep its comments
+	doc     *yaml.Node // the tree Load read, so Save can keep its comments
+	comment []byte     // a file holding only comments, which yaml.v3 drops
 }
 
 // Context is one named broker connection.
@@ -104,8 +105,11 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("parse config %q: %w", path, err)
 	}
 	var doc yaml.Node
-	if err := yaml.Unmarshal(data, &doc); err == nil && len(doc.Content) == 1 && doc.Content[0].Kind == yaml.MappingNode {
+	switch err := yaml.Unmarshal(data, &doc); {
+	case err == nil && len(doc.Content) == 1 && doc.Content[0].Kind == yaml.MappingNode:
 		c.doc = &doc
+	case err == nil && doc.Kind == 0 && len(bytes.TrimSpace(data)) > 0:
+		c.comment = data
 	}
 	return &c, nil
 }
@@ -166,6 +170,12 @@ func (c *Config) encode() (data []byte, keptComments bool, err error) {
 		doc, keptComments = c.doc, true
 	}
 	var buf bytes.Buffer
+	if c.doc == nil && len(c.comment) > 0 {
+		buf.Write(c.comment)
+		if !bytes.HasSuffix(c.comment, []byte("\n")) {
+			buf.WriteByte('\n')
+		}
+	}
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
 	if err := enc.Encode(doc); err != nil {

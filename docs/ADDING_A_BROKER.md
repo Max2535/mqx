@@ -31,7 +31,10 @@ import (
 const Type = "nats"
 
 func init() {
-    broker.Register(Type, broker.Driver{Open: open, Validate: validate})
+    broker.Register(Type, broker.Driver{Open: open, Validate: validate,
+        // Context fields the TUI form and `mqx ctx add` flags offer for this
+        // broker, besides name, username_env, password_env and read_only.
+        Fields: []string{"url", "tls.enabled", "tls.ca_file", "options"}})
 }
 
 // validate checks broker-specific fields without network access. The caller

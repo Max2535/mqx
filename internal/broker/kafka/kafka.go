@@ -23,7 +23,13 @@ import (
 const Type = "kafka"
 
 func init() {
-	broker.Register(Type, broker.Driver{Open: open, Validate: validate})
+	broker.Register(Type, broker.Driver{Open: open, Validate: validate, Fields: []string{
+		"brokers", "sasl_mechanism",
+		"tls.enabled", "tls.ca_file", "tls.cert_file", "tls.key_file", "tls.insecure_skip_verify",
+		"schema_registry.url", "schema_registry.username_env", "schema_registry.password_env",
+		"connect.url", "connect.username_env", "connect.password_env",
+		"ksqldb.url", "ksqldb.username_env", "ksqldb.password_env",
+	}})
 }
 
 func validate(c config.Context) []error {

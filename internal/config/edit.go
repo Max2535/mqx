@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"slices"
 )
 
 // Add appends ctx. The name must be set and not already taken.
@@ -62,4 +63,24 @@ func (c *Config) index(name string) int {
 		}
 	}
 	return -1
+}
+
+// Update applies edit, validates the whole config and saves it to path. On any
+// error the config is left exactly as it was, so a rejected edit changes nothing.
+func (c *Config) Update(path string, brokers BrokerValidator, edit func(*Config) error) error {
+	prevCurrent, prevContexts := c.CurrentContext, slices.Clone(c.Contexts)
+	rollback := func() { c.CurrentContext, c.Contexts = prevCurrent, prevContexts }
+	if err := edit(c); err != nil {
+		rollback()
+		return err
+	}
+	if err := c.Validate(brokers); err != nil {
+		rollback()
+		return err
+	}
+	if err := c.Save(path); err != nil {
+		rollback()
+		return err
+	}
+	return nil
 }
