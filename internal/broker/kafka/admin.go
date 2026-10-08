@@ -5,12 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kerr"
 
 	"github.com/Max2535/mqx/internal/broker"
 )
+
+// topicPropagation bounds how long CreateTopic waits for the new topic to show in metadata.
+const topicPropagation = 5 * time.Second
 
 // CreateTopic implements broker.TopicAdmin. Zero partitions or replication
 // factor use the broker defaults.
@@ -35,6 +39,7 @@ func (k *Kafka) CreateTopic(ctx context.Context, spec broker.TopicSpec) error {
 	}
 	switch {
 	case err == nil:
+		k.awaitTopic(ctx, spec.Name)
 		return nil
 	case errors.Is(err, kerr.TopicAlreadyExists):
 		return fmt.Errorf("create topic %q: %w; delete it first or pick another name", spec.Name, err)
@@ -45,6 +50,28 @@ func (k *Kafka) CreateTopic(ctx context.Context, spec broker.TopicSpec) error {
 		return wrapErr(fmt.Sprintf("create topic %q (%s)", spec.Name, resp.ErrMessage), err)
 	}
 	return wrapErr(fmt.Sprintf("create topic %q", spec.Name), err)
+}
+
+// awaitTopic waits briefly until a new topic shows in metadata with leaders,
+// so a publish right after create does not fail. It gives up silently.
+func (k *Kafka) awaitTopic(ctx context.Context, name string) {
+	ctx, cancel := context.WithTimeout(ctx, topicPropagation)
+	defer cancel()
+	for ctx.Err() == nil {
+		if tds, err := k.adm.ListTopics(ctx, name); err == nil && tds[name].Err == nil && len(tds[name].Partitions) > 0 {
+			ready := true
+			for _, p := range tds[name].Partitions {
+				ready = ready && p.Err == nil && p.Leader >= 0
+			}
+			if ready {
+				return
+			}
+		}
+		select {
+		case <-ctx.Done():
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
 }
 
 // DeleteTopic implements broker.TopicAdmin.
