@@ -23,20 +23,21 @@ administer clusters through one interface, without a web UI.
 
 ## Install
 
-Homebrew (macOS and Linux):
+Download a binary for Linux, macOS or Windows (amd64 or arm64) from
+[Releases](https://github.com/Max2535/mqx/releases), unpack it and put `mqx` on your `PATH`.
 
-```sh
-brew install --cask max2535/tap/mqx
-```
-
-With Go 1.26 or newer:
+Or install with Go 1.26 or newer:
 
 ```sh
 go install github.com/Max2535/mqx/cmd/mqx@latest
 ```
 
-Or download a binary for Linux, macOS or Windows (amd64 or arm64) from
-[Releases](https://github.com/Max2535/mqx/releases).
+Or build from source:
+
+```sh
+git clone https://github.com/Max2535/mqx.git && cd mqx
+go build -o mqx ./cmd/mqx
+```
 
 ## Configure
 
