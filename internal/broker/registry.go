@@ -18,6 +18,9 @@ type Driver struct {
 	// Validate checks the broker-specific fields of a context without network access.
 	// Returned errors are prefixed with the context label by the caller.
 	Validate func(c config.Context) []error
+	// Fields lists the config.Fields keys this broker uses besides config.CommonFields,
+	// so editors show only those. Nil shows every field.
+	Fields []string
 }
 
 // The registry is the only package-level mutable state in mqx. It is written
@@ -70,6 +73,18 @@ func Open(ctx context.Context, c config.Context) (Broker, error) {
 		return nil, fmt.Errorf("context %q: connect to %s: %w", c.Name, c.Broker, err)
 	}
 	return b, nil
+}
+
+// ContextFields returns the editable fields for a broker type: the common ones
+// plus those its driver lists. An unknown type gets every field.
+func ContextFields(brokerType string) []config.Field {
+	mu.RLock()
+	d, ok := drivers[brokerType]
+	mu.RUnlock()
+	if !ok {
+		return config.Fields()
+	}
+	return config.FieldsFor(d.Fields)
 }
 
 // Validator adapts the registry to config.BrokerValidator.

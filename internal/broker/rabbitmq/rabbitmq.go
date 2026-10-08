@@ -23,7 +23,11 @@ import (
 const Type = "rabbitmq"
 
 func init() {
-	broker.Register(Type, broker.Driver{Open: open, Validate: validate})
+	broker.Register(Type, broker.Driver{Open: open, Validate: validate, Fields: []string{
+		"url", "management_url",
+		"tls.enabled", "tls.ca_file", "tls.cert_file", "tls.key_file", "tls.insecure_skip_verify",
+		"options",
+	}})
 }
 
 // Compile-time checks that the adapter implements its capabilities.

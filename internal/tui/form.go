@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"fmt"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/cursor"
@@ -16,6 +19,8 @@ const (
 	fieldText fieldKind = iota
 	fieldSecret
 	fieldArea
+	fieldBool   // space or ←/→ toggles; value "true" or "false"
+	fieldChoice // ←/→ or space cycles through choices
 )
 
 // field is one input of a form.
@@ -25,6 +30,8 @@ type field struct {
 	hint  string // placeholder
 	value string // initial value
 	kind  fieldKind
+	// choices are a fieldChoice's values; "" shows as "(none)".
+	choices []string
 }
 
 // values are the submitted form fields by key.
@@ -38,6 +45,7 @@ type form struct {
 	fields []field
 	inputs []textinput.Model
 	areas  []textarea.Model
+	picks  []int // selected index of each bool (0 false, 1 true) and choice field
 	focus  int
 	err    string
 	submit func(values) (tea.Cmd, error)
@@ -45,8 +53,19 @@ type form struct {
 
 func newForm(title string, fields []field, submit func(values) (tea.Cmd, error)) *form {
 	f := &form{title: title, fields: fields, submit: submit,
-		inputs: make([]textinput.Model, len(fields)), areas: make([]textarea.Model, len(fields))}
+		inputs: make([]textinput.Model, len(fields)), areas: make([]textarea.Model, len(fields)),
+		picks: make([]int, len(fields))}
 	for i, fd := range fields {
+		switch fd.kind {
+		case fieldBool:
+			if fd.value == "true" {
+				f.picks[i] = 1
+			}
+			continue
+		case fieldChoice:
+			f.picks[i] = max(0, slices.Index(fd.choices, fd.value))
+			continue
+		}
 		if fd.kind == fieldArea {
 			ta := textarea.New()
 			ta.Placeholder = fd.hint
@@ -78,6 +97,9 @@ func (f *form) setFocus(i int) {
 	}
 	f.focus = (i + len(f.fields)) % len(f.fields)
 	for j := range f.fields {
+		if f.fields[j].picked() {
+			continue
+		}
 		if f.fields[j].kind == fieldArea {
 			if j == f.focus {
 				f.areas[j].Focus()
@@ -97,9 +119,14 @@ func (f *form) setFocus(i int) {
 func (f *form) values() values {
 	v := values{}
 	for i, fd := range f.fields {
-		if fd.kind == fieldArea {
+		switch fd.kind {
+		case fieldBool:
+			v[fd.key] = strconv.FormatBool(f.picks[i] == 1)
+		case fieldChoice:
+			v[fd.key] = fd.choices[f.picks[i]]
+		case fieldArea:
 			v[fd.key] = f.areas[i].Value()
-		} else {
+		default:
 			v[fd.key] = strings.TrimSpace(f.inputs[i].Value())
 		}
 	}
@@ -113,6 +140,9 @@ func (f *form) Update(msg tea.Msg) (overlay, tea.Cmd) {
 		return f, nil
 	}
 	area := len(f.fields) > 0 && f.fields[f.focus].kind == fieldArea
+	if len(f.fields) > 0 && f.fields[f.focus].picked() && f.pick(km.String()) {
+		return f, nil
+	}
 	switch km.String() {
 	case "esc":
 		return nil, statusInfo("cancelled")
@@ -140,6 +170,9 @@ func (f *form) Update(msg tea.Msg) (overlay, tea.Cmd) {
 	if len(f.fields) == 0 {
 		return f, nil
 	}
+	if f.fields[f.focus].picked() {
+		return f, nil // typing does nothing on a toggle or choice
+	}
 	var cmd tea.Cmd
 	if area {
 		f.areas[f.focus], cmd = f.areas[f.focus].Update(msg)
@@ -147,6 +180,25 @@ func (f *form) Update(msg tea.Msg) (overlay, tea.Cmd) {
 		f.inputs[f.focus], cmd = f.inputs[f.focus].Update(msg)
 	}
 	return f, cmd
+}
+
+func (fd field) picked() bool { return fd.kind == fieldBool || fd.kind == fieldChoice }
+
+// pick changes the focused bool or choice field; it reports whether k was used.
+func (f *form) pick(k string) bool {
+	n := 2
+	if f.fields[f.focus].kind == fieldChoice {
+		n = len(f.fields[f.focus].choices)
+	}
+	switch k {
+	case " ", "right", "l", "x":
+		f.picks[f.focus] = (f.picks[f.focus] + 1) % n
+	case "left", "h":
+		f.picks[f.focus] = (f.picks[f.focus] - 1 + n) % n
+	default:
+		return false
+	}
+	return true
 }
 
 func (f *form) doSubmit() (overlay, tea.Cmd) {
@@ -159,7 +211,7 @@ func (f *form) doSubmit() (overlay, tea.Cmd) {
 }
 
 // View implements overlay.
-func (f *form) View(width, _ int) string {
+func (f *form) View(width, height int) string {
 	inner := min(max(40, width-10), 90)
 	labelW := 0
 	for _, fd := range f.fields {
@@ -167,7 +219,15 @@ func (f *form) View(width, _ int) string {
 	}
 	var b strings.Builder
 	b.WriteString(st.title.Render(f.title) + "\n\n")
-	for i, fd := range f.fields {
+	first, last := 0, 0
+	if len(f.fields) > 0 {
+		first, last = f.window(height - 8)
+	}
+	if first > 0 {
+		b.WriteString(st.muted.Render(fmt.Sprintf("↑ %d more", first)) + "\n")
+	}
+	for i := first; i < last; i++ {
+		fd := f.fields[i]
 		label := pad(fd.label, labelW)
 		if i == f.focus {
 			label = st.navActive.Render(label)
@@ -177,14 +237,87 @@ func (f *form) View(width, _ int) string {
 			b.WriteString(label + "\n" + f.areas[i].View() + "\n")
 			continue
 		}
+		if fd.picked() {
+			b.WriteString(label + " : " + f.pickView(i) + "\n")
+			continue
+		}
 		f.inputs[i].Width = max(10, inner-labelW-3)
 		b.WriteString(label + " : " + f.inputs[i].View() + "\n")
+	}
+	if last < len(f.fields) {
+		b.WriteString(st.muted.Render(fmt.Sprintf("↓ %d more", len(f.fields)-last)) + "\n")
+	}
+	onPick := len(f.fields) > 0 && f.fields[f.focus].picked()
+	if onPick && f.fields[f.focus].hint != "" {
+		b.WriteString(st.muted.Render(wrap(f.fields[f.focus].hint, inner)) + "\n")
 	}
 	if f.err != "" {
 		b.WriteString("\n" + st.err.Render(wrap(f.err, inner)) + "\n")
 	}
-	b.WriteString("\n" + st.muted.Render("tab next • enter next/submit • ctrl+s submit • esc cancel"))
+	keys := "tab next • enter next/submit • ctrl+s submit • esc cancel"
+	if onPick {
+		keys = "←/→/space change • " + keys
+	}
+	b.WriteString("\n" + st.muted.Render(keys))
 	return st.dialog.Width(inner + 2).Render(b.String())
+}
+
+func (f *form) pickView(i int) string {
+	fd := f.fields[i]
+	var text string
+	if fd.kind == fieldBool {
+		text = "[ ]"
+		if f.picks[i] == 1 {
+			text = "[x]"
+		}
+	} else {
+		text = fd.choices[f.picks[i]]
+		if text == "" {
+			text = "(none)"
+		}
+		text = "‹ " + text + " ›"
+	}
+	if i == f.focus {
+		return st.navActive.Render(text)
+	}
+	return text
+}
+
+// window returns the range of fields to show in about rows lines, keeping the
+// focused one visible. Text areas count as several lines.
+func (f *form) window(rows int) (first, last int) {
+	lines := func(i int) int {
+		if f.fields[i].kind == fieldArea {
+			return 7 // label + 6 rows
+		}
+		return 1
+	}
+	rows = max(rows, lines(f.focus)+2)
+	used := 0
+	for i := range f.fields {
+		used += lines(i)
+	}
+	if used <= rows {
+		return 0, len(f.fields)
+	}
+	rows -= 2 // the "more" markers
+	first, last, used = f.focus, f.focus+1, lines(f.focus)
+	for {
+		grew := false
+		if last < len(f.fields) && used+lines(last) <= rows {
+			used += lines(last)
+			last++
+			grew = true
+		}
+		if first > 0 && used+lines(first-1) <= rows {
+			first--
+			used += lines(first)
+			grew = true
+		}
+		if !grew {
+			return first, last
+		}
+	}
 }
 
 // wrap breaks s into lines of at most width cells.

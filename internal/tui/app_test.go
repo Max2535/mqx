@@ -205,7 +205,7 @@ func TestContextSwitching(t *testing.T) {
 	oldGen := h.a.e.gen
 
 	h.keys("c")
-	h.wantView("Switch context", "kafka-dev", "rabbit-prod", "read-only")
+	h.wantView("Contexts", "kafka-dev", "rabbit-prod", "read-only")
 	h.keys("down", "enter")
 
 	if !fa.Closed() {
