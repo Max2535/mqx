@@ -91,7 +91,7 @@ contexts:
 			if err != nil {
 				t.Fatalf("Load() unexpected error: %v", err)
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if !sameConfig(got, tt.want) {
 				t.Errorf("Load() = %+v, want %+v", got, tt.want)
 			}
 		})
@@ -115,7 +115,7 @@ func TestSaveRoundTrip(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Load() error: %v", err)
 		}
-		if !reflect.DeepEqual(got, cfg) {
+		if !sameConfig(got, cfg) {
 			t.Fatalf("round trip = %+v, want %+v", got, cfg)
 		}
 	}
@@ -135,6 +135,11 @@ func TestSaveRoundTrip(t *testing.T) {
 	if len(entries) != 1 {
 		t.Errorf("config dir has %d entries, want only config.yaml (temp file left behind?)", len(entries))
 	}
+}
+
+// sameConfig compares the data of two configs, ignoring the loaded YAML tree.
+func sameConfig(a, b *Config) bool {
+	return a.CurrentContext == b.CurrentContext && reflect.DeepEqual(a.Contexts, b.Contexts)
 }
 
 func TestDefaultPath(t *testing.T) {
