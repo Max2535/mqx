@@ -392,6 +392,8 @@ func TestLinkStatusAndParametersRedact(t *testing.T) {
 func TestPutUserKeepsPasswordWhenEmpty(t *testing.T) {
 	f, r := newFakeAPI(t)
 	f.status("PUT /api/users/alice", http.StatusNoContent, "")
+	f.status("PUT /api/users/bob", http.StatusNoContent, "")
+	f.json("GET /api/users/alice", `{"name":"alice","password_hash":"HASH","hashing_algorithm":"rabbit_password_hashing_sha256"}`)
 	ctx := context.Background()
 	if err := r.PutUser(ctx, broker.User{Name: "alice", Tags: []string{"a", "b"}}, ""); err != nil {
 		t.Fatal(err)
@@ -399,7 +401,14 @@ func TestPutUserKeepsPasswordWhenEmpty(t *testing.T) {
 	if err := r.PutUser(ctx, broker.User{Name: "alice"}, "pw!"); err != nil {
 		t.Fatal(err)
 	}
-	if f.bodies[0] != `{"tags":"a,b"}` || f.bodies[1] != `{"password":"pw!","tags":""}` {
+	if err := r.PutUser(ctx, broker.User{Name: "bob"}, ""); err != nil { // new user: GET 404, no password
+		t.Fatal(err)
+	}
+	want := []string{
+		"", `{"hashing_algorithm":"rabbit_password_hashing_sha256","password_hash":"HASH","tags":"a,b"}`,
+		`{"password":"pw!","tags":""}`, "", `{"tags":""}`,
+	}
+	if !reflect.DeepEqual(f.bodies, want) {
 		t.Errorf("bodies = %q", f.bodies)
 	}
 }

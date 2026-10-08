@@ -64,6 +64,22 @@ func (r *RabbitMQ) PutUser(ctx context.Context, u broker.User, password string) 
 	body := map[string]any{"tags": strings.Join(u.Tags, ",")}
 	if password != "" {
 		body["password"] = password
+	} else {
+		// A PUT without a password clears it, so carry the current hash over.
+		var cur struct {
+			PasswordHash     string `json:"password_hash"`
+			HashingAlgorithm string `json:"hashing_algorithm"`
+		}
+		err := r.mgmt.get(ctx, apiPath("users", u.Name), &cur)
+		switch {
+		case err == nil:
+			body["password_hash"] = cur.PasswordHash
+			if cur.HashingAlgorithm != "" {
+				body["hashing_algorithm"] = cur.HashingAlgorithm
+			}
+		case !errors.Is(err, errNotFound):
+			return fmt.Errorf("put user %q: read current password hash: %w", u.Name, err)
+		}
 	}
 	if err := r.mgmt.put(ctx, apiPath("users", u.Name), body); err != nil {
 		return fmt.Errorf("put user %q: %w", u.Name, err)
