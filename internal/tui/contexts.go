@@ -261,6 +261,9 @@ func newContextForm(store *contextStore, c config.Context, isNew bool) *form {
 		}
 		err := store.update(func(cfg *config.Config) error {
 			if isNew {
+				if cfg.CurrentContext == "" { // the first context becomes the default, like `mqx ctx add`
+					cfg.CurrentContext = next.Name
+				}
 				return cfg.Add(next)
 			}
 			return cfg.Replace(old, next)

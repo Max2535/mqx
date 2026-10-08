@@ -197,6 +197,27 @@ func TestContextEditWithoutFile(t *testing.T) {
 	h.wantStatus("no config file to save to", true)
 }
 
+func TestContextFirstBecomesDefault(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	cfg, _, err := loadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &harness{t: t, a: newApp(appConfig{cfg: cfg, path: path, now: newClock().now})}
+	h.run(h.a.Init())
+	h.keys("c")
+	h.wantView("No contexts yet")
+	h.keys("n", "enter")
+	h.typeText("only")
+	focusField(h, "options")
+	h.typeText("instance=x")
+	h.keys("ctrl+s")
+	h.wantView("only (default)")
+	if saved, _ := loadFile(t, path); saved.CurrentContext != "only" {
+		t.Errorf("current-context = %q, want only", saved.CurrentContext)
+	}
+}
+
 func TestLoadConfigMissingFileIsEmpty(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "absent.yaml")
 	cfg, got, err := loadConfig(path)
