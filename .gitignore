@@ -1,0 +1,9 @@
+# Build outputs
+/mqx
+/mqx.exe
+/dist/
+
+# Test and coverage artifacts
+*.test
+*.out
+coverage.*
