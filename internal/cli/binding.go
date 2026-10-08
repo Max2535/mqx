@@ -112,7 +112,7 @@ func newBindCmd(o *options) *cobra.Command {
 				if err := te.Bind(ctx, b); err != nil {
 					return err
 				}
-				return o.done(cmd, "bound %s", describeBindingCLI(b))
+				return o.done(cmd, "Bound %s.", describeBindingCLI(b))
 			})
 		},
 	}
@@ -147,7 +147,7 @@ several bindings differ only in their arguments, pass --arg or --properties-key
 				if err := te.Unbind(ctx, b); err != nil {
 					return err
 				}
-				return o.done(cmd, "unbound %s", describeBindingCLI(b))
+				return o.done(cmd, "Unbound %s.", describeBindingCLI(b))
 			})
 		},
 	}

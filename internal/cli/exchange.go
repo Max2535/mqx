@@ -107,7 +107,7 @@ func newExchangeDeclareCmd(o *options) *cobra.Command {
 				if err := te.DeclareExchange(ctx, ex); err != nil {
 					return err
 				}
-				return o.done(cmd, "declared %s exchange %q", ex.Type, ex.Name)
+				return o.done(cmd, "Declared %s exchange %q.", ex.Type, ex.Name)
 			})
 		},
 	}
@@ -139,7 +139,7 @@ func newExchangeDeleteCmd(o *options) *cobra.Command {
 				if err := te.DeleteExchange(ctx, name); err != nil {
 					return err
 				}
-				return o.done(cmd, "deleted exchange %q", name)
+				return o.done(cmd, "Deleted exchange %q.", name)
 			})
 		},
 	}
