@@ -63,8 +63,12 @@ func (r *RabbitMQ) Peek(ctx context.Context, topic string, opts broker.PeekOptio
 		// leaves a quorum queue's x-delivery-count unchanged; a channel close
 		// or reject counts towards delivery-limit (RabbitMQ 4.x), so repeated
 		// peeks would eventually drop or dead-letter the message.
-		if last := r.peekQueue(ctx, ch, topic, info.Messages, opts, out); last > 0 {
-			_ = ch.Nack(last, true, true)
+		last, held := r.peekQueue(ctx, ch, topic, info.Messages, opts, out)
+		if last == 0 {
+			return
+		}
+		if err := ch.Nack(last, true, true); err == nil {
+			awaitRequeue(ch, topic, held)
 		}
 	}()
 	return out, nil
@@ -73,7 +77,7 @@ func (r *RabbitMQ) Peek(ctx context.Context, topic string, opts broker.PeekOptio
 // peekQueue gets messages within the scan budget and returns the last delivery tag it holds.
 func (r *RabbitMQ) peekQueue(ctx context.Context, ch *amqp.Channel, topic string, depth int, opts broker.PeekOptions,
 	out chan<- broker.Message,
-) (last uint64) {
+) (last uint64, held int) {
 	scan, capped := depth, false
 	if scan > r.settings.peekMaxScan {
 		scan, capped = r.settings.peekMaxScan, true
@@ -84,27 +88,27 @@ func (r *RabbitMQ) peekQueue(ctx context.Context, ch *amqp.Channel, topic string
 	sent := 0
 	for i := 0; i < scan; i++ {
 		if ctx.Err() != nil {
-			return last
+			return last, held
 		}
 		d, ok, err := ch.Get(topic, false)
 		if err != nil {
 			send(ctx, out, broker.Message{Topic: topic, Err: amqpErr("peek queue", topic, err)})
-			return last
+			return last, held
 		}
 		if !ok {
-			return last // queue drained by other consumers meanwhile
+			return last, held // queue drained by other consumers meanwhile
 		}
-		last = d.DeliveryTag
+		last, held = d.DeliveryTag, held+1
 		m := fromDelivery(d, topic, int64(i))
 		if !opts.Filter.Match(m) {
 			continue
 		}
 		if !send(ctx, out, m) {
-			return last
+			return last, held
 		}
 		sent++
 		if opts.Limit > 0 && sent >= opts.Limit {
-			return last
+			return last, held
 		}
 	}
 	if capped {
@@ -112,7 +116,25 @@ func (r *RabbitMQ) peekQueue(ctx context.Context, ch *amqp.Channel, topic string
 			"stopped after scanning %d of %d messages in %q; raise options.%s on the context to scan further",
 			scan, depth, topic, OptPeekMaxScan)})
 	}
-	return last
+	return last, held
+}
+
+// requeueWait bounds how long a peek waits for its requeued messages to be ready again.
+const requeueWait = 2 * time.Second
+
+// awaitRequeue waits until the queue reports at least held ready messages.
+// Requeueing is asynchronous (quorum queues apply it through Raft), so without
+// this a peek right after another can find the queue momentarily empty.
+// Consumers may take the messages meanwhile, so the wait is bounded, not an error.
+func awaitRequeue(ch *amqp.Channel, topic string, held int) {
+	deadline := time.Now().Add(requeueWait)
+	for time.Now().Before(deadline) {
+		info, err := ch.QueueDeclarePassive(topic, false, false, false, false, nil)
+		if err != nil || info.Messages >= held {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 // send delivers m unless ctx ended first.
