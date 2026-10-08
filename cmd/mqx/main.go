@@ -1,4 +1,4 @@
-// Command mqx inspects, peeks and publishes messages across brokers.
+// Command mqx inspects, peeks, publishes and administers message brokers.
 package main
 
 import (
@@ -6,6 +6,9 @@ import (
 	"os"
 	"os/signal"
 
+	// Each adapter registers itself; adding a broker means adding one import here.
+	_ "github.com/Max2535/mqx/internal/broker/kafka"
+	_ "github.com/Max2535/mqx/internal/broker/rabbitmq"
 	"github.com/Max2535/mqx/internal/cli"
 )
 

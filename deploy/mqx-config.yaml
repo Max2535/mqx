@@ -1,0 +1,20 @@
+# mqx contexts for the docker-compose stack. Credentials come from env vars:
+#   export MQX_RABBIT_USER=guest MQX_RABBIT_PASS=guest
+current-context: local-kafka
+contexts:
+  - name: local-kafka
+    broker: kafka
+    brokers: ["localhost:9092"]
+    schema_registry: { url: "http://localhost:8081" }
+    connect: { url: "http://localhost:8083" }
+    ksqldb: { url: "http://localhost:8088" }
+  - name: local-kafka-ro
+    broker: kafka
+    brokers: ["localhost:9092"]
+    read_only: true
+  - name: local-rabbit
+    broker: rabbitmq
+    url: amqp://localhost:5672/
+    management_url: http://localhost:15672
+    username_env: MQX_RABBIT_USER
+    password_env: MQX_RABBIT_PASS

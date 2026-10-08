@@ -22,21 +22,30 @@ func (c Credentials) GoString() string { return c.String() }
 // Resolve reads the referenced env vars. Unreferenced fields stay empty.
 // A referenced but unset variable is an error; all such errors are joined.
 func (c Context) Resolve() (Credentials, error) {
+	return resolve(fmt.Sprintf("context %q", c.Name), c.UsernameEnv, c.PasswordEnv)
+}
+
+// Resolve reads the endpoint's credentials; label names it in errors, e.g. `context "a" schema_registry`.
+func (e Endpoint) Resolve(label string) (Credentials, error) {
+	return resolve(label, e.UsernameEnv, e.PasswordEnv)
+}
+
+func resolve(label, userEnv, passEnv string) (Credentials, error) {
 	var creds Credentials
 	var errs []error
 	for _, f := range []struct {
 		key, env string
 		dst      *string
 	}{
-		{key: "username_env", env: c.UsernameEnv, dst: &creds.Username},
-		{key: "password_env", env: c.PasswordEnv, dst: &creds.Password},
+		{key: "username_env", env: userEnv, dst: &creds.Username},
+		{key: "password_env", env: passEnv, dst: &creds.Password},
 	} {
 		if f.env == "" {
 			continue
 		}
 		v, ok := os.LookupEnv(f.env)
 		if !ok {
-			errs = append(errs, fmt.Errorf("context %q: env var %s (%s) is not set", c.Name, f.env, f.key))
+			errs = append(errs, fmt.Errorf("%s: env var %s (%s) is not set", label, f.env, f.key))
 			continue
 		}
 		*f.dst = v
@@ -45,4 +54,14 @@ func (c Context) Resolve() (Credentials, error) {
 		return Credentials{}, err
 	}
 	return creds, nil
+}
+
+// Find returns the context called name.
+func (c *Config) Find(name string) (Context, error) {
+	for _, ctx := range c.Contexts {
+		if ctx.Name == name {
+			return ctx, nil
+		}
+	}
+	return Context{}, c.notFound(name)
 }
