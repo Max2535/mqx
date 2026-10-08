@@ -168,8 +168,8 @@ func TestPublishViaExchange(t *testing.T) {
 }
 
 // Quorum queues dead-letter or drop a message after delivery-limit (20 by
-// default) requeues. Peek returns held messages by closing the channel, which
-// must not count as a failed delivery.
+// default) failed deliveries. Peek returns held messages with one explicit nack,
+// which must not count, and waits until they are ready again.
 func TestQuorumPeekIsRepeatable(t *testing.T) {
 	e := newEnv(t)
 	ctx := testCtx(t)
