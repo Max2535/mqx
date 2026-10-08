@@ -34,11 +34,16 @@ const requestTimeout = 30 * time.Second
 // Run loads the config, opens the selected context and runs the full-screen
 // UI until the user quits or ctx ends.
 func Run(ctx context.Context, opts Options) error {
-	cfg, err := loadConfig(opts.ConfigPath)
+	cfg, path, err := loadConfig(opts.ConfigPath)
 	if err != nil {
 		return err
 	}
-	a := newApp(startConfig(ctx, cfg, opts))
+	c := startConfig(ctx, cfg, opts)
+	c.path = path
+	if len(cfg.Contexts) == 0 && c.status.text == "" {
+		c.status = statusMsg{text: fmt.Sprintf("no contexts in %s; press c then n to create one", path)}
+	}
+	a := newApp(c)
 	a.animate = true
 	a.tick = func(d time.Duration, msg tea.Msg) tea.Cmd {
 		return tea.Tick(d, func(time.Time) tea.Msg { return msg })
@@ -87,24 +92,26 @@ func startConfig(ctx context.Context, cfg *config.Config, opts Options) appConfi
 	return c
 }
 
-// loadConfig loads and validates the config like the CLI does.
-func loadConfig(path string) (*config.Config, error) {
+// loadConfig loads and validates the config like the CLI does, and returns
+// its path. A missing file is an empty config: contexts created in the TUI
+// are saved there.
+func loadConfig(path string) (*config.Config, string, error) {
 	if path == "" {
 		p, err := config.DefaultPath()
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		path = p
 	}
 	cfg, err := config.Load(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, fmt.Errorf("no config at %s; create it (see README) or pass --config: %w", path, err)
+		return &config.Config{}, path, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if err := cfg.Validate(broker.Validator()); err != nil {
-		return nil, fmt.Errorf("invalid config %s:\n%w", path, err)
+		return nil, "", fmt.Errorf("invalid config %s:\n%w", path, err)
 	}
-	return cfg, nil
+	return cfg, path, nil
 }

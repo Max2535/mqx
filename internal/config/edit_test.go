@@ -220,3 +220,24 @@ contexts:
 		t.Errorf("dir has %d entries, want config and its backup", len(entries))
 	}
 }
+
+func TestSaveKeepsCommentOnlyFile(t *testing.T) {
+	path := writeConfig(t, "# my contexts\n# one per cluster\n")
+	c, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Add(kafkaCtx("a")); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(path)
+	if !strings.HasPrefix(string(data), "# my contexts\n# one per cluster\n") {
+		t.Errorf("comment lost:\n%s", data)
+	}
+	if got, err := Load(path); err != nil || len(got.Contexts) != 1 {
+		t.Errorf("reload = %+v, %v", got, err)
+	}
+}
