@@ -107,3 +107,19 @@ func (c *Config) Save(path string) error {
 	}
 	return nil
 }
+
+// Use makes name the current context. It does not save; call Save afterwards.
+func (c *Config) Use(name string) error {
+	names := make([]string, 0, len(c.Contexts))
+	for _, ctx := range c.Contexts {
+		if ctx.Name == name {
+			c.CurrentContext = name
+			return nil
+		}
+		names = append(names, ctx.Name)
+	}
+	if len(names) == 0 {
+		return fmt.Errorf("context %q not found; no contexts defined in config", name)
+	}
+	return fmt.Errorf("context %q not found; available: %s", name, strings.Join(names, ", "))
+}
