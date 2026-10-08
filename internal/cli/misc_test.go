@@ -212,3 +212,11 @@ func TestParseArgs(t *testing.T) {
 		t.Errorf("parseArgs = %#v", got)
 	}
 }
+
+func TestSampleConfigIsValid(t *testing.T) {
+	stdout, _, err := runWith(t, nil, nil, "--config", "../../deploy/mqx-config.yaml", "ctx", "list")
+	checkErr(t, err, "")
+	if !strings.Contains(stdout, "local-rabbit") {
+		t.Errorf("ctx list = %s", stdout)
+	}
+}
