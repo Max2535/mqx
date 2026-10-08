@@ -64,14 +64,16 @@ func pluginHint(component string) string {
 	return "enable the rabbitmq_shovel and rabbitmq_shovel_management plugins"
 }
 
-// withPluginHint explains 404s (and "unknown component" 400s) from plugin endpoints.
+// withPluginHint explains the errors plugin endpoints give when the plugin is
+// off: 404, a bare 400 for an unknown path (RabbitMQ 4.x), or a 400 naming an
+// unknown parameter component.
 func withPluginHint(component string, err error) error {
 	var ae *apiError
 	if !errors.As(err, &ae) {
 		return err
 	}
 	if ae.Status == http.StatusNotFound ||
-		(ae.Status == http.StatusBadRequest && strings.Contains(ae.Reason, "component")) {
+		(ae.Status == http.StatusBadRequest && (ae.Reason == "" || strings.Contains(ae.Reason, "component"))) {
 		return fmt.Errorf("%w (%s)", err, pluginHint(component))
 	}
 	return err
