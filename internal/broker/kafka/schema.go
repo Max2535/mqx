@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -114,7 +115,8 @@ func (k *Kafka) RegisterSchema(ctx context.Context, subject string, s broker.Sch
 	}
 	in := sr.Schema{Schema: s.Schema, Type: typ}
 	for _, ref := range s.References {
-		in.References = append(in.References, sr.SchemaReference{Name: ref.Subject, Subject: ref.Subject, Version: ref.Version})
+		name := cmp.Or(ref.Name, ref.Subject)
+		in.References = append(in.References, sr.SchemaReference{Name: name, Subject: ref.Subject, Version: ref.Version})
 	}
 	id, err := r.cl.RegisterSchema(ctx, subject, in, -1, -1)
 	return id, srErr(fmt.Sprintf("register schema under %q", subject), err)
@@ -165,7 +167,7 @@ type regSchema struct {
 func (s regSchema) public() broker.Schema {
 	out := broker.Schema{Subject: s.Subject, Version: s.Version, ID: s.ID, Type: s.Type, Schema: s.Text}
 	for _, r := range s.Refs {
-		out.References = append(out.References, broker.SchemaRef{Subject: r.Subject, Version: r.Version})
+		out.References = append(out.References, broker.SchemaRef{Name: r.Name, Subject: r.Subject, Version: r.Version})
 	}
 	return out
 }
