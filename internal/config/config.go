@@ -38,7 +38,34 @@ type Context struct {
 	ManagementURL string   `yaml:"management_url,omitempty"` // rabbitmq management API
 	UsernameEnv   string   `yaml:"username_env,omitempty"`
 	PasswordEnv   string   `yaml:"password_env,omitempty"`
-	ReadOnly      bool     `yaml:"read_only,omitempty"` // refuse mutating commands (enforced from M3)
+	ReadOnly      bool     `yaml:"read_only,omitempty"` // refuse mutating commands
+
+	SASLMechanism string `yaml:"sasl_mechanism,omitempty"` // kafka: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512
+	TLS           *TLS   `yaml:"tls,omitempty"`
+
+	// Kafka ecosystem services, each with its own credentials.
+	SchemaRegistry *Endpoint `yaml:"schema_registry,omitempty"`
+	Connect        *Endpoint `yaml:"connect,omitempty"`
+	KSQLDB         *Endpoint `yaml:"ksqldb,omitempty"`
+
+	// Options holds broker-specific settings, so a new broker needs no new fields here.
+	Options map[string]string `yaml:"options,omitempty"`
+}
+
+// TLS configures transport security. Files are paths, never inline PEM.
+type TLS struct {
+	Enabled            bool   `yaml:"enabled"`
+	CAFile             string `yaml:"ca_file,omitempty"`
+	CertFile           string `yaml:"cert_file,omitempty"`
+	KeyFile            string `yaml:"key_file,omitempty"`
+	InsecureSkipVerify bool   `yaml:"insecure_skip_verify,omitempty"`
+}
+
+// Endpoint is an HTTP service next to the broker (Schema Registry, Connect, ksqlDB).
+type Endpoint struct {
+	URL         string `yaml:"url"`
+	UsernameEnv string `yaml:"username_env,omitempty"`
+	PasswordEnv string `yaml:"password_env,omitempty"`
 }
 
 // DefaultPath returns $MQX_CONFIG, or ~/.config/mqx/config.yaml on every OS.
@@ -129,12 +156,16 @@ func (c *Config) Save(path string) error {
 
 // Use makes name the current context. It does not save; call Save afterwards.
 func (c *Config) Use(name string) error {
+	if _, err := c.Find(name); err != nil {
+		return err
+	}
+	c.CurrentContext = name
+	return nil
+}
+
+func (c *Config) notFound(name string) error {
 	names := make([]string, 0, len(c.Contexts))
 	for _, ctx := range c.Contexts {
-		if ctx.Name == name {
-			c.CurrentContext = name
-			return nil
-		}
 		names = append(names, ctx.Name)
 	}
 	if len(names) == 0 {

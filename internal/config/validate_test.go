@@ -1,9 +1,31 @@
 package config
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
+
+// fakeBrokers stands in for the broker registry: kafka needs brokers, rabbitmq needs url.
+type fakeBrokers struct{}
+
+func (fakeBrokers) Supported() []string { return []string{"kafka", "rabbitmq"} }
+
+func (fakeBrokers) ValidateContext(c Context) ([]error, bool) {
+	switch c.Broker {
+	case "kafka":
+		if len(c.Brokers) == 0 {
+			return []error{errors.New("kafka needs at least one entry in brokers")}, true
+		}
+		return nil, true
+	case "rabbitmq":
+		if c.URL == "" {
+			return []error{errors.New("rabbitmq needs url")}, true
+		}
+		return nil, true
+	}
+	return nil, false
+}
 
 func kafkaCtx(name string) Context {
 	return Context{Name: name, Broker: "kafka", Brokers: []string{"localhost:9092"}}
@@ -95,15 +117,20 @@ func TestValidate(t *testing.T) {
 			secret: "s3cret",
 		},
 		{
-			name:   "kafka broker with credentials",
-			cfg:    Config{Contexts: []Context{{Name: "a", Broker: "kafka", Brokers: []string{"localhost:9092", "user:s3cret@host:9092"}}}},
-			want:   []string{`context "a": brokers[1] must be host:port; credentials go in username_env / password_env`},
+			name:   "endpoint with password",
+			cfg:    Config{Contexts: []Context{{Name: "a", Broker: "kafka", Brokers: []string{"h:9092"}, SchemaRegistry: &Endpoint{URL: "http://u:s3cret@sr:8081"}}}},
+			want:   []string{`context "a": schema_registry.url must not embed a password`},
 			secret: "s3cret",
 		},
 		{
-			name: "kafka broker without port",
-			cfg:  Config{Contexts: []Context{{Name: "a", Broker: "kafka", Brokers: []string{"localhost"}}}},
-			want: []string{`context "a": brokers[0] must be host:port`},
+			name: "endpoint without url",
+			cfg:  Config{Contexts: []Context{{Name: "a", Broker: "kafka", Brokers: []string{"h:9092"}, Connect: &Endpoint{}}}},
+			want: []string{`context "a": connect.url is required`},
+		},
+		{
+			name: "tls cert without key",
+			cfg:  Config{Contexts: []Context{{Name: "a", Broker: "kafka", Brokers: []string{"h:9092"}, TLS: &TLS{Enabled: true, CertFile: "c.pem"}}}},
+			want: []string{`context "a": tls.cert_file and tls.key_file must be set together`},
 		},
 		{
 			name: "unknown current context",
@@ -121,7 +148,7 @@ func TestValidate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.cfg.Validate()
+			err := tt.cfg.Validate(fakeBrokers{})
 			if tt.want == nil {
 				if err != nil {
 					t.Fatalf("Validate() unexpected error: %v", err)

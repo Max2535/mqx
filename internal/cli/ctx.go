@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/Max2535/mqx/internal/broker"
 	"github.com/Max2535/mqx/internal/config"
 )
 
@@ -44,7 +45,7 @@ func newCtxListCmd(opts *options) *cobra.Command {
 			if err := printContexts(cmd.OutOrStdout(), cfg); err != nil {
 				return err
 			}
-			if err := cfg.Validate(); err != nil {
+			if err := cfg.Validate(broker.Validator()); err != nil {
 				return fmt.Errorf("invalid config %s:\n%w", path, err)
 			}
 			return nil
@@ -69,7 +70,7 @@ func newCtxUseCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := cfg.Validate(); err != nil {
+			if err := cfg.Validate(broker.Validator()); err != nil {
 				return fmt.Errorf("invalid config %s:\n%w", path, err)
 			}
 			if err := cfg.Use(args[0]); err != nil {
