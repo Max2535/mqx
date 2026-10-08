@@ -138,7 +138,7 @@ func newTUICmd(o *options) *cobra.Command {
 	var t TUIOptions
 	cmd := &cobra.Command{
 		Use:   "tui",
-		Short: "Open the interactive terminal UI",
+		Short: "Open the interactive terminal UI (--context, --topic, --group deep-link)",
 		Example: `  mqx tui
   mqx tui --context prod-kafka --topic orders --group billing`,
 		Args: cobra.NoArgs,
@@ -146,14 +146,10 @@ func newTUICmd(o *options) *cobra.Command {
 			if o.runTUI == nil {
 				return errNoTUI
 			}
-			t.ConfigPath = o.configPath
-			if t.Context == "" {
-				t.Context = o.contextName
-			}
+			t.ConfigPath, t.Context = o.configPath, o.contextName
 			return o.runTUI(cmd.Context(), t)
 		},
 	}
-	cmd.Flags().StringVar(&t.Context, "context", "", "open this context")
 	cmd.Flags().StringVar(&t.Topic, "topic", "", "open this topic or queue")
 	cmd.Flags().StringVar(&t.Group, "group", "", "open this consumer group")
 	return cmd
