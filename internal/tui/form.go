@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -53,6 +54,9 @@ type form struct {
 
 	history *formHistory
 	recall  int // next history entry ctrl+r restores
+
+	// advise, when set, returns hints about the current values, shown under the fields.
+	advise func(values) []string
 }
 
 func newForm(title string, fields []field, submit func(values) (tea.Cmd, error)) *form {
@@ -226,11 +230,15 @@ func (f *form) Update(msg tea.Msg) (overlay, tea.Cmd) {
 	if f.fields[f.focus].picked() {
 		return f, nil // typing does nothing on a toggle or choice
 	}
+	before := f.values()
 	var cmd tea.Cmd
 	if area {
 		f.areas[f.focus], cmd = f.areas[f.focus].Update(msg)
 	} else {
 		f.inputs[f.focus], cmd = f.inputs[f.focus].Update(msg)
+	}
+	if !maps.Equal(before, f.values()) {
+		f.err = "" // the error was about the old values
 	}
 	return f, cmd
 }
@@ -305,6 +313,11 @@ func (f *form) View(width, height int) string {
 	onPick := len(f.fields) > 0 && f.fields[f.focus].picked()
 	if onPick && f.fields[f.focus].hint != "" {
 		b.WriteString(st.muted.Render(wrap(f.fields[f.focus].hint, inner)) + "\n")
+	}
+	if f.advise != nil {
+		if hints := f.advise(f.values()); len(hints) > 0 {
+			b.WriteString("\n" + st.warn.Render(wrap(bullets(hints), inner)) + "\n")
+		}
 	}
 	if f.err != "" {
 		b.WriteString("\n" + st.err.Render(wrap(f.err, inner)) + "\n")

@@ -38,6 +38,8 @@ type listing struct {
 	header string
 	cols   []string
 	rows   []row
+	// extra carries facts beyond the rows to resource.loaded.
+	extra any
 }
 
 type loadedMsg struct {

@@ -182,6 +182,13 @@ first, secrets excluded), and key/value fields such as Headers accept either
 such as `__consumer_offsets`, asks you to type its name; the CLI needs
 `--allow-internal`.
 
+Admin forms hint as you type, and the confirm dialog repeats the hints. Examples:
+a replication factor above the broker count (refused before it reaches Kafka),
+replication factor 1 on a multi-broker cluster, `min.insync.replicas` above the
+replication factor, a name that already exists or mixes `.` and `_`, adding
+partitions to a keyed topic, and quorum or stream queues declared non-durable or
+auto-delete.
+
 Contexts edited in the TUI are saved to the config file. With no config file
 yet, the TUI opens empty: press `c` then `n` to create the first context.
 
