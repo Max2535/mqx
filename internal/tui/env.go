@@ -37,6 +37,8 @@ type env struct {
 	nodes  int
 	// history keeps form submissions across contexts.
 	history *formHistory
+	// assist enables the Assistant panel; nil when the config disables it.
+	assist *assistSetup
 	// spin is the current spinner frame, updated by the root model.
 	spin string
 }
@@ -57,7 +59,12 @@ func (e *env) newID() int {
 // call runs fn with a timeout-bounded context in a tea.Cmd and routes its
 // result to view to.
 func (e *env) call(to int, fn func(ctx context.Context) tea.Msg) tea.Cmd {
-	gen, base, timeout := e.gen, e.base, e.timeout
+	return e.callFor(to, e.timeout, fn)
+}
+
+// callFor is call with its own timeout, for work longer than one broker request.
+func (e *env) callFor(to int, timeout time.Duration, fn func(ctx context.Context) tea.Msg) tea.Cmd {
+	gen, base := e.gen, e.base
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(base, timeout)
 		defer cancel()

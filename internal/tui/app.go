@@ -32,6 +32,7 @@ type appConfig struct {
 	now     func() time.Time
 	tick    func(d time.Duration, msg tea.Msg) tea.Cmd
 	animate bool // run the spinner
+	assist  *assistSetup
 }
 
 type connState int
@@ -155,7 +156,7 @@ func (a *app) opened(m openedMsg) tea.Cmd {
 	base, cancel := context.WithCancel(a.base)
 	a.cancelEnv = cancel
 	a.e = &env{ctx: m.c, b: m.b, base: base, timeout: a.timeout, now: a.now, tick: a.tick, gen: a.gen, ids: &ids,
-		spin: a.spinner.View(), history: a.history}
+		spin: a.spinner.View(), history: a.history, assist: a.assist}
 	a.conn, a.connErr = connOK, ""
 	if m.pingErr != nil {
 		a.conn, a.connErr = connFailed, m.pingErr.Error()

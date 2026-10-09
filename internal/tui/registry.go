@@ -41,5 +41,8 @@ func buildPanels(e *env, links deepLinks) []panel {
 			out = append(out, s.build(e, links))
 		}
 	}
+	if e.assist != nil {
+		out = append(out, newAssistantPanel(e))
+	}
 	return out
 }
