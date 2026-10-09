@@ -9,7 +9,7 @@
 One CLI and TUI for Kafka and RabbitMQ. Inspect, peek, publish, debug consumers and
 administer clusters through one interface, without a web UI.
 
-![mqx demo: CLI peek, route dry-run, read-only refusal and the TUI](docs/demo.gif)
+![mqx demo: CLI peek, route dry-run and read-only refusal, then the TUI command palette, publish with ctrl+r recall and create-topic hints](docs/demo.gif)
 
 ## Two things mqx is built for
 

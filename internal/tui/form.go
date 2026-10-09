@@ -316,7 +316,7 @@ func (f *form) View(width, height int) string {
 	}
 	if f.advise != nil {
 		if hints := f.advise(f.values()); len(hints) > 0 {
-			b.WriteString("\n" + st.warn.Render(wrap(bullets(hints), inner)) + "\n")
+			b.WriteString("\n" + st.warn.Render(wrapNotes(bullets(hints), inner)) + "\n")
 		}
 	}
 	if f.err != "" {
