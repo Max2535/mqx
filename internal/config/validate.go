@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -38,6 +39,9 @@ func (c *Config) Validate(brokers BrokerValidator) error {
 		}
 		seen[ctx.Name] = true
 		errs = append(errs, ctx.validate(label, brokers)...)
+	}
+	if e := c.Assistant.Effort; e != "" && !slices.Contains(AssistantEfforts, e) {
+		errs = append(errs, fmt.Errorf("assistant: effort %q is not one of %s", e, strings.Join(AssistantEfforts, ", ")))
 	}
 	if c.CurrentContext != "" && !seen[c.CurrentContext] {
 		errs = append(errs, fmt.Errorf("current-context %q does not exist; run `mqx ctx use <name>` with a name from `mqx ctx list`",

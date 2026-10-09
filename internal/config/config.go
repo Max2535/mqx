@@ -28,10 +28,26 @@ const literalSecretHint = "credentials must not be stored in the config; " +
 type Config struct {
 	CurrentContext string    `yaml:"current-context"`
 	Contexts       []Context `yaml:"contexts"`
+	// Assistant configures the TUI's AI assistant panel.
+	Assistant Assistant `yaml:"assistant,omitempty"`
 
 	doc     *yaml.Node // the tree Load read, so Save can keep its comments
 	comment []byte     // a file holding only comments, which yaml.v3 drops
 }
+
+// Assistant configures the TUI's AI assistant. Its API credentials come from
+// ANTHROPIC_API_KEY (or an `ant auth login` profile), never from this file.
+type Assistant struct {
+	Disabled bool   `yaml:"disabled,omitempty"`
+	Model    string `yaml:"model,omitempty"`  // default claude-opus-5-5
+	Effort   string `yaml:"effort,omitempty"` // low, medium (default), high, xhigh, max
+	// SendPayloads lets the assistant read message keys, headers and values,
+	// which sends them to the API. Off by default: only metadata is sent.
+	SendPayloads bool `yaml:"send_payloads,omitempty"`
+}
+
+// AssistantEfforts are the accepted assistant.effort values.
+var AssistantEfforts = []string{"low", "medium", "high", "xhigh", "max"}
 
 // Context is one named broker connection.
 type Context struct {

@@ -188,6 +188,27 @@ yet, the TUI opens empty: press `c` then `n` to create the first context.
 On `read_only` contexts mutating keys are hidden. Elsewhere, every mutation opens a
 confirm dialog whose default answer is Cancel.
 
+#### Assistant
+
+The last panel, **Assistant**, answers questions about the open context in plain
+language: "why is billing lagging?", "which topics have a single replica?",
+"where does order.created.eu go?". Claude answers by running read-only queries
+against the broker (topics, partitions, nodes, groups, lag, `group diagnose`,
+exchanges, bindings, route dry-runs), and you can watch each query as it runs.
+It cannot change anything. When a change would help, it gives you the `mqx`
+command to run, which then goes through the usual confirmation.
+
+It needs `ANTHROPIC_API_KEY` (or `ant auth login`). Only metadata is sent to the
+API by default; message keys, headers and values are sent only if you allow it:
+
+```yaml
+assistant:
+  model: claude-opus-5-5   # default
+  effort: medium           # low, medium (default), high, xhigh, max
+  send_payloads: false     # true lets it peek at up to 20 messages
+  disabled: false          # true removes the panel
+```
+
 ### Messages
 
 ```sh

@@ -63,9 +63,17 @@ func fakeCtx(t *testing.T, name string, readOnly bool, caps []string) (*fakebrok
 
 func newHarness(t *testing.T, opts Options, contexts ...config.Context) *harness {
 	t.Helper()
+	return newHarnessWith(t, opts, nil, contexts...)
+}
+
+// newHarnessWith is newHarness with the Assistant panel backed by assist, or
+// without it when assist is nil.
+func newHarnessWith(t *testing.T, opts Options, assist *assistSetup, contexts ...config.Context) *harness {
+	t.Helper()
 	cfg := &config.Config{CurrentContext: contexts[0].Name, Contexts: contexts}
 	c := startConfig(context.Background(), cfg, opts)
 	c.now = newClock().now
+	c.assist = assist
 	h := &harness{t: t, a: newApp(c)}
 	h.run(h.a.Init())
 	return h

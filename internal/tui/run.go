@@ -14,6 +14,8 @@ import (
 	"io/fs"
 	"time"
 
+	"github.com/Max2535/mqx/internal/assistant"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Max2535/mqx/internal/broker"
@@ -74,6 +76,9 @@ func startConfig(ctx context.Context, cfg *config.Config, opts Options) appConfi
 		base:    ctx,
 		timeout: requestTimeout,
 		now:     time.Now,
+	}
+	if !cfg.Assistant.Disabled {
+		c.assist = &assistSetup{send: assistant.NewSender(), cfg: cfg.Assistant}
 	}
 	if opts.Context != "" {
 		if _, err := cfg.Find(opts.Context); err != nil {

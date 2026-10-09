@@ -134,6 +134,19 @@ Callers diff two samples (`broker.Rates`) to get per-second rates, so adapters
 need no history: `mqx metrics` prints a line per interval and the TUI keeps a
 ring buffer for sparklines.
 
+## Assistant
+
+`internal/assistant` runs a tool-use loop against the Claude Messages API
+(`anthropic-sdk-go`). The tools come from the broker's capabilities, so like the
+panels they follow what the broker supports. Every tool is read-only, so the
+assistant needs no mutation guard. Changes come back as `mqx` commands, which
+then go through the guard when the user runs them. `peek_messages` exists only
+when `assistant.send_payloads` is on, because it sends message contents to the
+API. `Session.Step` does one request plus the tools it asks for, so the TUI runs
+each step as a command, shows each query as it happens and stops after a fixed
+number of rounds. The `Sender` function type lets tests replace the API with
+scripted replies.
+
 ## Testing
 
 - Unit tests: table-driven, stdlib `testing`.
