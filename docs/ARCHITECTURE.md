@@ -94,7 +94,9 @@ Adapters never check `read_only`. Every mutating action passes one guard:
   a confirm dialog whose default is Cancel. An action can declare a `danger`
   (publishing to an internal topic) that makes the dialog ask for the name to be
   typed. The command palette runs actions by sending their keys, so it cannot
-  bypass the guard.
+  bypass the guard. An action's `advise` returns non-blocking hints
+  (`internal/tui/hints.go`) that the form shows live and the confirm dialog
+  repeats; what would certainly fail goes in its `check` instead.
 
 Publishing is treated as mutating.
 

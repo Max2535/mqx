@@ -30,9 +30,11 @@ type env struct {
 	// topic is the topic or queue last selected in the Topics panel; the
 	// Consumers and Metrics panels follow it.
 	topic string
-	// internal names the topics the broker reported as internal in the last
-	// Topics listing; publishing to one needs the name typed to confirm.
-	internal map[string]bool
+	// topics are the topics or queues of the last Topics listing by name, and
+	// nodes the number of brokers then (0 when unknown). Forms use them for
+	// hints, and publishing to an internal topic needs its name typed.
+	topics map[string]broker.Topic
+	nodes  int
 	// history keeps form submissions across contexts.
 	history *formHistory
 	// spin is the current spinner frame, updated by the root model.

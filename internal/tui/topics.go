@@ -51,12 +51,13 @@ func newTopicsPanel(e *env, focus string) panel {
 		focusOpen: browse,
 		onSelect:  func(r row) { e.topic = r.key },
 		loaded: func(l listing) {
-			e.internal = map[string]bool{}
+			e.topics = map[string]broker.Topic{}
 			for _, r := range l.rows {
-				if t, ok := r.data.(broker.Topic); ok && t.Internal {
-					e.internal[t.Name] = true
+				if t, ok := r.data.(broker.Topic); ok {
+					e.topics[t.Name] = t
 				}
 			}
+			e.nodes, _ = l.extra.(int)
 		},
 		actions: actions,
 	})
@@ -94,7 +95,20 @@ func loadTopics(ctx context.Context, e *env) (listing, error) {
 		}
 		rows[i] = row{key: t.Name, cells: cells, data: t}
 	}
-	return listing{rows: rows}, nil
+	return listing{rows: rows, extra: countNodes(ctx, e)}, nil
+}
+
+// countNodes returns the number of brokers, or 0 when the broker cannot tell.
+// Hints only need it, so a failure is not an error.
+func countNodes(ctx context.Context, e *env) int {
+	if !e.has(broker.CapClusterInspector) {
+		return 0
+	}
+	nodes, err := as[broker.ClusterInspector](e).Nodes(ctx)
+	if err != nil {
+		return 0
+	}
+	return len(nodes)
 }
 
 // count renders a number that may be unknown (-1).
@@ -199,10 +213,14 @@ func topicActions(e *env, topic func(r *row) string, needsRow bool) []action {
 			form: func(r *row) (string, []field) {
 				return "Add partitions to " + topic(r), []field{{key: "total", label: "New partition count"}}
 			},
-			check: func(_ *row, v values) error {
-				_, err := positiveInt(v["total"])
-				return err
+			check: func(r *row, v values) error {
+				n, err := positiveInt(v["total"])
+				if err != nil {
+					return err
+				}
+				return tooFewPartitions(e, topic(r), n)
 			},
+			advise: func(r *row, v values) []string { return addPartitionsHints(e, topic(r), v) },
 			describe: func(r *row, v values) string {
 				return fmt.Sprintf("Increase partitions of topic %s to %s", topic(r), v["total"])
 			},
@@ -307,9 +325,12 @@ func createTopicAction(e *env) action {
 			return "New " + kind, fields
 		},
 		check: func(_ *row, v values) error {
-			_, err := topicSpec(v)
-			return err
+			if _, err := topicSpec(v); err != nil {
+				return err
+			}
+			return tooManyReplicas(e, v)
 		},
+		advise:   func(_ *row, v values) []string { return createTopicHints(e, v) },
 		describe: func(_ *row, v values) string { return fmt.Sprintf("Create %s %s", kind, v["name"]) },
 		run: func(ctx context.Context, _ *row, v values) (string, error) {
 			spec, err := topicSpec(v)
