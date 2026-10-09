@@ -1,9 +1,43 @@
 # mqx
 
+**Debug Kafka rebalances and RabbitMQ routing from the terminal.**
+
+[![CI](https://github.com/Max2535/mqx/actions/workflows/ci.yml/badge.svg)](https://github.com/Max2535/mqx/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Max2535/mqx)](https://github.com/Max2535/mqx/releases)
+[![License: MIT](https://img.shields.io/github/license/Max2535/mqx)](LICENSE)
+
 One CLI and TUI for Kafka and RabbitMQ. Inspect, peek, publish, debug consumers and
 administer clusters through one interface, without a web UI.
 
 ![mqx demo: CLI peek, route dry-run, read-only refusal and the TUI](docs/demo.gif)
+
+## Two things mqx is built for
+
+**Why does my consumer group keep rebalancing?**
+
+```sh
+mqx group diagnose billing
+mqx group watch billing      # timeline of state changes with rebalance durations
+```
+
+`diagnose` inspects the group and reports likely causes with suggested fixes: stale
+members left by an unclean shutdown, more members than partitions, one group id
+shared by apps that subscribe to different topics, rebalancing groups, empty groups
+that still have lag, partitions with no committed offset, and uneven assignments.
+It works with both the classic protocol and KIP-848.
+
+**Where does this routing key end up?**
+
+```sh
+mqx route orders.x --key order.created.eu
+```
+
+`route` resolves a routing key through the binding graph and lists the queues it
+reaches, without publishing anything. It handles direct, topic, fanout and default
+exchanges, exchange-to-exchange bindings and alternate exchanges. Headers and plugin
+exchanges are reported as not simulated rather than guessed.
+
+## And everything around them
 
 - **Browse**: topics, partitions, configs and brokers; queues, exchanges, bindings,
   vhosts, connections and channels.
@@ -12,14 +46,29 @@ administer clusters through one interface, without a web UI.
   (Avro, Protobuf, JSON Schema) are decoded and encoded.
 - **Consumers**: groups, members, assignments and lag. You can reset offsets, delete
   groups, remove static members and close connections.
-- **Rebalance debugging**: `mqx group describe | watch | diagnose`.
-- **Routing dry-run**: `mqx route` shows which queues a routing key reaches,
-  without publishing anything.
 - **Admin**: topic and queue CRUD, configs, partitions, purge and delete-records,
   exchanges and bindings (including exchange to exchange), Kafka Connect, ksqlDB,
   ACLs, RabbitMQ users, vhosts, permissions, policies, shovels and federation.
 - **Metrics**: message rates, lag and depth over time.
 - **Safety**: contexts can be `read_only`. Every mutating action needs confirmation.
+
+## How it fits with other tools
+
+mqx does not replace the mature tools below. It is for people who work in a terminal
+and use both brokers.
+
+| Tool | Interface | Brokers |
+|---|---|---|
+| mqx | CLI and TUI | Kafka and RabbitMQ |
+| [kcat](https://github.com/edenhill/kcat) | CLI | Kafka |
+| [AKHQ](https://github.com/tchiotludo/akhq) | GUI | Kafka |
+| [Kafka UI](https://github.com/kafbat/kafka-ui) | web UI | Kafka |
+| [RabbitMQ management plugin](https://www.rabbitmq.com/docs/management) | browser UI, HTTP API and `rabbitmqadmin` | RabbitMQ |
+
+If you need a shared web UI for a team, role-based access control (Kafka UI documents
+it) or the full RabbitMQ HTTP API, use those. mqx is a single binary with no server
+component, and it reads credentials from environment variables, so you run it from your
+own machine or a jump host.
 
 ## Install
 
@@ -182,6 +231,7 @@ mqx group remove-member billing --instance-id billing-0 --yes
 - one group id shared by apps that subscribe to different topics
 - rebalancing groups
 - empty groups that still have lag
+- partitions with no committed offset
 - uneven assignments
 
 It works with both the classic protocol and KIP-848 (`group.protocol=consumer`).

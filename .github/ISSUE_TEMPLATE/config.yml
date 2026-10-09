@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Adding a broker
+    url: https://github.com/Max2535/mqx/blob/main/docs/ADDING_A_BROKER.md
+    about: Want to add a broker yourself? Read this first, then open a feature request to agree on the approach.
