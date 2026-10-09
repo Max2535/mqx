@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // confirmDialog asks before a mutating action. Focus starts on Cancel, so a
@@ -82,7 +83,7 @@ func (d *confirmDialog) View(width, height int) string {
 	var b strings.Builder
 	b.WriteString(st.warn.Render(wrap(d.prompt, inner)) + "\n")
 	if d.detail != "" {
-		b.WriteString("\n" + clipLines(d.detail, inner, max(3, height-12)) + "\n")
+		b.WriteString("\n" + clipLines(wrapNotes(d.detail, inner), inner, max(3, height-12)) + "\n")
 	}
 	if d.typed != "" {
 		b.WriteString("\nType " + st.navActive.Render(d.typed) + " to confirm:\n" + d.input.View() + "\n")
@@ -136,4 +137,22 @@ func (h *helpOverlay) View(_, _ int) string {
 	}
 	b.WriteString("\n" + st.muted.Render("press any key to close"))
 	return st.dialog.Render(b.String())
+}
+
+// wrapNotes wraps the warning (⚠) and hint (•) lines of a confirm detail with
+// a hanging indent, leaving other lines, such as preview tables, as they are.
+func wrapNotes(detail string, width int) string {
+	lines := strings.Split(detail, "\n")
+	for i, l := range lines {
+		for _, mark := range []string{"⚠ ", "• "} {
+			if text, ok := strings.CutPrefix(l, mark); ok && lipgloss.Width(l) > width {
+				wrapped := strings.Split(wrap(text, width-2), "\n")
+				for j := range wrapped {
+					wrapped[j] = strings.TrimRight(wrapped[j], " ")
+				}
+				lines[i] = mark + strings.Join(wrapped, "\n  ")
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
 }

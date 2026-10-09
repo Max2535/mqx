@@ -87,7 +87,7 @@ func publishAction(e *env, topic func(r *row) string, needsRow bool) action {
 			return err
 		},
 		danger: func(r *row, v values) (string, string) {
-			if t := topic(r); v["exchange"] == "" && e.internal[t] {
+			if t := topic(r); v["exchange"] == "" && e.topics[t].Internal {
 				return fmt.Sprintf("%s is an internal %s that the broker manages itself. "+
 					"Writing to it can corrupt cluster state, e.g. the transaction coordinator or committed offsets.", t, e.kind()), t
 			}

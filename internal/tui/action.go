@@ -36,6 +36,9 @@ type action struct {
 	// danger, when it returns a warning, shows it in the confirm dialog and
 	// makes the user type word instead of pressing y.
 	danger func(r *row, v values) (warning, word string)
+	// advise returns hints the form shows while typing and the confirm
+	// dialog repeats; see hints.go.
+	advise func(r *row, v values) []string
 	// preview runs before the confirm dialog (e.g. an offset-reset dry run).
 	preview func(ctx context.Context, r *row, v values) (string, error)
 	run     func(ctx context.Context, r *row, v values) (string, error)
@@ -100,14 +103,18 @@ func startAction(e *env, id int, a action, r *row) tea.Cmd {
 		return execAction(e, id, a, r, values{})
 	}
 	title, fields := a.form(r)
-	return openOverlay(newForm(title, fields, func(v values) (tea.Cmd, error) {
+	f := newForm(title, fields, func(v values) (tea.Cmd, error) {
 		if a.check != nil {
 			if err := a.check(r, v); err != nil {
 				return nil, err
 			}
 		}
 		return execAction(e, id, a, r, v), nil
-	}).remember(e.history))
+	}).remember(e.history)
+	if a.advise != nil {
+		f.advise = func(v values) []string { return a.advise(r, v) }
+	}
+	return openOverlay(f)
 }
 
 func execAction(e *env, id int, a action, r *row, v values) tea.Cmd {
@@ -134,6 +141,11 @@ func guarded(e *env, id int, a action, r *row, v values, detail string) tea.Cmd 
 		var warning string
 		if warning, word = a.danger(r, v); warning != "" {
 			detail = strings.TrimSpace("⚠ " + warning + "\n\n" + detail)
+		}
+	}
+	if a.advise != nil {
+		if hints := a.advise(r, v); len(hints) > 0 {
+			detail = strings.TrimSpace(detail + "\n\n" + bullets(hints))
 		}
 	}
 	return e.mutate(id, what, detail, word, func(ctx context.Context) tea.Msg {
@@ -163,4 +175,9 @@ func handleAction(e *env, id int, msg tea.Msg) (handled bool, cmd tea.Cmd, reloa
 		return true, statusInfo(text), m.mutated, m.out
 	}
 	return false, nil, false, ""
+}
+
+// bullets renders hints one per line.
+func bullets(hints []string) string {
+	return "• " + strings.Join(hints, "\n• ")
 }
