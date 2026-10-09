@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest a feature, or a new broker
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the situation you are in, not only the feature you want.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like mqx to do?
+      description: A sketch of the command, flags or TUI behavior helps.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Kafka
+        - RabbitMQ
+        - A new broker (please name it below)
+        - TUI
+        - CLI
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you use today?
+      description: The tool or workaround you use now, and what is missing from it.

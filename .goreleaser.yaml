@@ -31,6 +31,8 @@ checksum:
 
 changelog:
   use: github
+  # No commit SHA in each line; keep the author so contributors get credit.
+  format: '{{ .Message }} ({{ with .AuthorUsername }}@{{ . }}{{ else }}{{ .AuthorName }}{{ end }})'
   groups:
     - title: Features
       regexp: '^.*?feat(\(.+\))??!?:.+$'
@@ -41,7 +43,7 @@ changelog:
     - title: Other
       order: 999
   filters:
-    exclude: ['^docs:', '^test:', '^ci:', '^chore:']
+    exclude: ['^docs:', '^test:', '^ci:', '^chore:', '^Merge ']
 
 homebrew_casks:
   - name: mqx
