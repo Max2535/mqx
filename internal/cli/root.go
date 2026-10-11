@@ -106,7 +106,7 @@ contexts and ask for confirmation (or --yes).`,
 			root.AddCommand(c)
 		}
 	}
-	root.AddCommand(newVersionCmd(), newCtxCmd(o), newTUICmd(o))
+	root.AddCommand(newVersionCmd(), newCtxCmd(o), newTUICmd(o), newMCPCmd(o))
 	add(groupBrowse, newPingCmd(o), newTopicsCmd(o), newTopicCmd(o), newPeekCmd(o), newPublishCmd(o),
 		newNodesCmd(o), newMetricsCmd(o))
 	add(groupConsumers, newConsumersCmd(o), newGroupsCmd(o), newGroupCmd(o), newConnectionsCmd(o), newChannelsCmd(o))

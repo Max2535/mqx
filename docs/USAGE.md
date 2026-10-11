@@ -11,6 +11,7 @@ overview see the [README](../README.md).
 - [Administration](#administration)
 - [Metrics](#metrics)
 - [Scripting](#scripting)
+- [MCP server](#mcp-server)
 
 ## Configure
 
@@ -232,3 +233,77 @@ Mutating commands work like this:
 - On a terminal they ask `[y/N]`.
 - In scripts they need `--yes`; without it they fail rather than block.
 - On a `read_only` context they always fail, `--yes` or not.
+
+## MCP server
+
+`mqx mcp` serves one context's read-only broker tools over the
+[Model Context Protocol](https://modelcontextprotocol.io) on stdio. MCP clients
+such as Claude Code, Claude Desktop and Cursor can then query the broker for
+you. These are the same tools the TUI Assistant uses.
+
+```sh
+mqx mcp --context prod-kafka                    # bound to prod-kafka
+mqx mcp --context dev-rabbit --allow-payloads   # also offer peek_messages
+```
+
+The server:
+
+- is bound to the context from `--context` or `current-context`, so an agent
+  cannot switch to another cluster. To give it several clusters, run one
+  server per context.
+- never changes the broker. Every tool is annotated read-only. When a change
+  would help, the agent is told to give you the `mqx` command, which still
+  goes through `read_only` and confirmation.
+- keeps message keys, headers and values private unless `--allow-payloads`
+  adds `peek_messages` (at most 20 messages, values cut at 2,000 bytes).
+- bounds each tool call with `--timeout` (default 30s).
+- reads credentials from the environment variables your context names, so
+  pass them in the client config.
+
+| Tool | Kafka | RabbitMQ |
+|---|---|---|
+| `list_topics`, `describe_topic`, `topic_consumers`, `list_nodes` | ✅ | ✅ |
+| `list_groups`, `describe_group`, `group_lag`, `diagnose_group` | ✅ | |
+| `list_exchanges`, `list_bindings`, `route` | | ✅ |
+| `peek_messages` (with `--allow-payloads`) | ✅ | ✅ |
+
+The tools offered depend on what the broker supports.
+
+### Claude Code
+
+```sh
+claude mcp add mqx-prod --env PROD_KAFKA_USER=... --env PROD_KAFKA_PASS=... \
+  -- mqx mcp --context prod-kafka
+```
+
+Or check it into a project as `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "mqx-local": {
+      "command": "mqx",
+      "args": ["mcp", "--context", "local-kafka"]
+    }
+  }
+}
+```
+
+### Claude Desktop, Cursor and other clients
+
+Add the same `command` and `args` to the client's MCP config. For example, in
+Claude Desktop's `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "mqx-prod": {
+      "command": "/opt/homebrew/bin/mqx",
+      "args": ["mcp", "--context", "prod-kafka", "--config", "/Users/me/.config/mqx/config.yaml"],
+      "env": { "PROD_KAFKA_USER": "...", "PROD_KAFKA_PASS": "..." }
+    }
+  }
+}
+```
+
+Desktop apps often start with a minimal `PATH`, so give the full path to `mqx`.

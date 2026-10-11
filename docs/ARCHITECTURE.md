@@ -149,6 +149,13 @@ each step as a command, shows each query as it happens and stops after a fixed
 number of rounds. The `Sender` function type lets tests replace the API with
 scripted replies.
 
+`internal/mcpserver` offers the same tools over the Model Context Protocol
+(`modelcontextprotocol/go-sdk`) for `mqx mcp`. Both callers go through
+`assistant.Invoke`, which checks arguments and encodes results the same way.
+The server is bound to the one context it was started with, and it marks every
+tool read-only. Broker and input errors come back as tool errors rather than
+protocol errors, so the client's model can read them and try something else.
+
 ## Testing
 
 - Unit tests: table-driven, stdlib `testing`.

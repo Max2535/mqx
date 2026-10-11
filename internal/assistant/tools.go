@@ -224,6 +224,41 @@ func capability[T any](b broker.Broker, name string) (T, bool) {
 	return t, ok && broker.Has(b, name)
 }
 
+// InputError is a tool call the model got wrong: Label is the short form the
+// TUI shows, Error the full text sent back to the model.
+type InputError struct{ Label, Msg string }
+
+func (e *InputError) Error() string { return e.Msg }
+
+// Invoke runs the tool called name with JSON arguments raw and returns its
+// result as JSON. Errors are meant for the model: they name the bad input or
+// the broker failure so it can retry with something else. Input mistakes are
+// *InputError.
+func Invoke(ctx context.Context, tools []Tool, name string, raw []byte) (string, error) {
+	var in Input
+	if len(bytes.TrimSpace(raw)) > 0 {
+		if err := json.Unmarshal(raw, &in); err != nil {
+			return "", &InputError{Label: "invalid input", Msg: "invalid JSON input: " + err.Error()}
+		}
+	}
+	for _, t := range tools {
+		if t.Name != name {
+			continue
+		}
+		for _, req := range t.Required {
+			if in.String(req) == "" {
+				return "", &InputError{Label: "missing " + req, Msg: fmt.Sprintf("missing required string argument %q", req)}
+			}
+		}
+		v, err := t.Run(ctx, in)
+		if err != nil {
+			return "", err
+		}
+		return encodeResult(v), nil
+	}
+	return "", &InputError{Label: "unknown tool", Msg: "unknown tool " + name}
+}
+
 // maxResult caps a tool result sent to the model.
 const maxResult = 40_000
 

@@ -5,7 +5,7 @@ package assistant
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -153,30 +153,15 @@ func (s *Session) Step(ctx context.Context) (Turn, error) {
 func (s *Session) run(ctx context.Context, use anthropic.BetaToolUseBlock) (call Call, result string, isErr bool) {
 	raw := use.JSON.Input.Raw()
 	call = Call{Tool: use.Name, Args: raw}
-	var in Input
-	if err := json.Unmarshal([]byte(raw), &in); err != nil {
-		call.Err = "invalid input"
-		return call, "invalid JSON input: " + err.Error(), true
+	out, err := Invoke(ctx, s.tools, use.Name, []byte(raw))
+	if err != nil {
+		call.Err = err.Error()
+		if ie := (*InputError)(nil); errors.As(err, &ie) {
+			call.Err = ie.Label
+		}
+		return call, err.Error(), true
 	}
-	for _, t := range s.tools {
-		if t.Name != use.Name {
-			continue
-		}
-		for _, req := range t.Required {
-			if in.String(req) == "" {
-				call.Err = "missing " + req
-				return call, fmt.Sprintf("missing required string argument %q", req), true
-			}
-		}
-		v, err := t.Run(ctx, in)
-		if err != nil {
-			call.Err = err.Error()
-			return call, err.Error(), true
-		}
-		return call, encodeResult(v), false
-	}
-	call.Err = "unknown tool"
-	return call, "unknown tool " + use.Name, true
+	return call, out, false
 }
 
 func systemPrompt(ctx Context, tools []Tool) string {
