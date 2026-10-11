@@ -53,7 +53,11 @@ func TestGuardMessageNamesActionAndContext(t *testing.T) {
 	e := newFakeEnv(t, true)
 	e.f.AddTopic("orders", 1)
 	_, _, err := e.run(t, "topic", "delete", "orders", "--yes")
-	if err == nil || !strings.Contains(err.Error(), `refusing to delete orders`) || !strings.Contains(err.Error(), `context "fake" is read_only`) {
-		t.Fatalf("error = %v", err)
+	want := `refusing to delete orders and all its messages: context "fake" is read_only; use a writable context with --context`
+	if err == nil || err.Error() != want {
+		t.Fatalf("error = %v, want %q", err, want)
+	}
+	if !errors.Is(err, ErrReadOnly) {
+		t.Fatalf("errors.Is(err, ErrReadOnly) = false for %v", err)
 	}
 }

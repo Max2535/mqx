@@ -98,7 +98,15 @@ func TestDiagnose(t *testing.T) {
 				member("a", []string{"orders"}, parts("orders", 0)), member("b", []string{"orders"}, parts("orders", 1)),
 				member("c", []string{"orders"}), member("d", []string{"orders"}),
 			}, nil, orders)},
-			want: []string{RuleMoreMembers}, wantText: "2 are idle", wantMember: []string{"c", "d"},
+			want: []string{RuleMoreMembers}, wantText: "2 are idle and only take over on failure", wantMember: []string{"c", "d"},
+		},
+		{
+			name: "one idle member reads singular",
+			snaps: []Snapshot{snap(0, "Stable", []broker.GroupMember{
+				member("a", []string{"orders"}, parts("orders", 0)), member("b", []string{"orders"}, parts("orders", 1)),
+				member("c", []string{"orders"}),
+			}, nil, orders)},
+			want: []string{RuleMoreMembers}, wantText: "1 is idle and only takes over on failure", wantMember: []string{"c"},
 		},
 		{
 			name: "shared group id",

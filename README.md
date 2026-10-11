@@ -25,9 +25,9 @@ things those tools don't.
 ```console
 $ mqx group diagnose fraud
 [warning] more-members-than-partitions: 3 members share 2 partitions
-  The subscribed topics have 2 partitions in total, so at most 2 of the 3 members get work; 1 are idle and only take over on failure.
+  The subscribed topics have 2 partitions in total, so at most 2 of the 3 members get work; 1 is idle and only takes over on failure.
   Fix: Scale the consumers down to 2, or add partitions with `mqx topic add-partitions <topic> --total N` (this changes key-to-partition mapping).
-  Members: fraud-fc7d413e-1bdf-4bec-9c73-35f82f4a9966
+  Members: fraud-a72a1bc0-9595-4bc7-bb50-37adda8423dd
 ```
 
 `group diagnose` samples the group and reports findings with a fix for each:
@@ -66,7 +66,7 @@ bindings and alternate exchanges. Headers and plugin exchanges are reported as
 
 ```console
 $ mqx topic delete orders --context prod-kafka --yes
-Error: refusing to delete orders and all its messages: context "prod-kafka" is read_only; use a writable context with --context: context is read_only
+Error: refusing to delete orders and all its messages: context "prod-kafka" is read_only; use a writable context with --context
 ```
 
 Mark a context `read_only: true` and every mutating command is refused, in the
