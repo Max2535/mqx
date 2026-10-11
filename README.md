@@ -83,6 +83,20 @@ watch each query as it runs. It cannot change anything. When a change would help
 it gives you the `mqx` command to run. By default it sends only metadata, never
 message payloads.
 
+### 🔌 Your coding agent can use it too, over MCP
+
+`mqx mcp` serves the same read-only tools to Claude Code, Claude Desktop, Cursor
+or any other MCP client. Each server is bound to one context and never changes
+the broker.
+
+```sh
+claude mcp add mqx-local -- mqx mcp --context local-kafka
+```
+
+Then ask your agent "is the billing group healthy?" and it runs `group_lag`
+and `diagnose_group` itself. See [MCP server](docs/USAGE.md#mcp-server) for the
+client config and the tool list.
+
 ## Try it in 60 seconds
 
 No cluster needed: the repo ships a Docker Compose stack. Install mqx first (see
