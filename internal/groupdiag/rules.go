@@ -200,12 +200,17 @@ func moreMembersThanPartitions(_, last Snapshot, _ []Snapshot) []Finding {
 			idle = append(idle, m.MemberID)
 		}
 	}
+	nIdle := len(members) - total
+	idleVerbs := "are idle and only take over"
+	if nIdle == 1 {
+		idleVerbs = "is idle and only takes over"
+	}
 	return []Finding{{
 		Severity: SeverityWarning,
 		Rule:     RuleMoreMembers,
 		Title:    fmt.Sprintf("%d members share %d partitions", len(members), total),
 		Detail: fmt.Sprintf("The subscribed topics have %d partitions in total, so at most %d of the %d members get work; "+
-			"%d are idle and only take over on failure.", total, total, len(members), len(members)-total),
+			"%d %s on failure.", total, total, len(members), nIdle, idleVerbs),
 		Fix: fmt.Sprintf("Scale the consumers down to %d, or add partitions with `mqx topic add-partitions <topic> --total N` "+
 			"(this changes key-to-partition mapping).", total),
 		Members: idle,

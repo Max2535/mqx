@@ -109,6 +109,16 @@ func capability[T any](s *session, name string) (T, error) {
 // ErrReadOnly is returned for a mutating command on a read_only context.
 var ErrReadOnly = errors.New("context is read_only")
 
+// readOnlyError is the refusal for a mutating command on a read_only context.
+// It matches ErrReadOnly without repeating its text.
+type readOnlyError struct{ action, context string }
+
+func (e *readOnlyError) Error() string {
+	return fmt.Sprintf("refusing to %s: context %q is read_only; use a writable context with --context", e.action, e.context)
+}
+
+func (e *readOnlyError) Is(target error) bool { return target == ErrReadOnly }
+
 // ErrNotConfirmed is returned when a mutating command was not confirmed.
 var ErrNotConfirmed = errors.New("not confirmed")
 
@@ -121,8 +131,7 @@ func (s *session) guard(cmd *cobra.Command, action string) error {
 
 func (o *options) guard(cmd *cobra.Command, c config.Context, action string) error {
 	if c.ReadOnly {
-		return fmt.Errorf("refusing to %s: context %q is read_only; use a writable context with --context: %w",
-			action, c.Name, ErrReadOnly)
+		return &readOnlyError{action: action, context: c.Name}
 	}
 	return o.confirm(cmd, action, fmt.Sprintf("%s on context %q", action, c.Name),
 		fmt.Sprintf("About to %s on context %q (%s).", action, c.Name, c.Broker))
