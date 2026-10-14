@@ -311,7 +311,12 @@ func (f *Fake) Peek(ctx context.Context, topicName string, opts broker.PeekOptio
 		case broker.AtOffset:
 			start = int(opts.From.Offset - t.low[p])
 		case broker.Tail:
-			start = len(part) - int(opts.From.Offset)
+			tail := opts.From.Offset
+			if tail >= int64(len(part)) {
+				start = 0
+			} else {
+				start = len(part) - int(tail)
+			}
 		}
 		start = max(0, min(start, len(part)))
 		msgs = append(msgs, part[start:]...)
