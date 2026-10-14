@@ -304,22 +304,18 @@ func (f *Fake) Peek(ctx context.Context, topicName string, opts broker.PeekOptio
 		if len(opts.Partitions) > 0 && !slices.Contains(opts.Partitions, int32(p)) {
 			continue
 		}
-		start := 0
+		size := int64(len(part))
+		start := int64(0)
 		switch opts.From.Kind {
 		case broker.Latest:
-			start = len(part)
+			start = size
 		case broker.AtOffset:
-			start = int(opts.From.Offset - t.low[p])
+			start = opts.From.Offset - t.low[p]
 		case broker.Tail:
-			tail := opts.From.Offset
-			if tail >= int64(len(part)) {
-				start = 0
-			} else {
-				start = len(part) - int(tail)
-			}
+			start = size - opts.From.Offset
 		}
-		start = max(0, min(start, len(part)))
-		msgs = append(msgs, part[start:]...)
+		// Clamp in int64 first so the narrowing conversion to int is always in range.
+		msgs = append(msgs, part[int(max(0, min(start, size))):]...)
 	}
 	f.mu.Unlock()
 	ch := make(chan broker.Message)
