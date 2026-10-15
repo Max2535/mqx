@@ -15,15 +15,15 @@ Type "export MQX_CONFIG=$PWD/deploy/mqx-config.yaml PS1='$ ' && clear"
 Enter
 Type "docker compose up -d --wait kafka >/dev/null 2>&1"
 Enter Sleep 20s
-Type "k() { docker compose exec -T kafka /opt/kafka/bin/\"$@\"; }; B='--bootstrap-server localhost:9092'"
+Type 'k() { local c=$1; shift; docker compose exec -T kafka /opt/kafka/bin/$c --bootstrap-server localhost:9092 "$@"; }'
 Enter
-Type "k kafka-topics.sh $B --delete --topic billing-events >/dev/null 2>&1; k kafka-consumer-groups.sh $B --delete --group billing >/dev/null 2>&1"
+Type "k kafka-topics.sh --delete --topic billing-events >/dev/null 2>&1; k kafka-consumer-groups.sh --delete --group billing >/dev/null 2>&1"
 Enter Sleep 3s
-Type "k kafka-topics.sh $B --create --topic billing-events --partitions 3 >/dev/null 2>&1"
+Type "k kafka-topics.sh --create --topic billing-events --partitions 3 >/dev/null 2>&1"
 Enter Sleep 3s
-Type "seq 1 30 | k kafka-console-producer.sh $B --topic billing-events >/dev/null 2>&1"
+Type "seq 1 30 | k kafka-console-producer.sh --topic billing-events >/dev/null 2>&1"
 Enter Sleep 4s
-Type "k kafka-console-consumer.sh $B --topic billing-events --group billing --from-beginning --max-messages 5 >/dev/null 2>&1"
+Type "k kafka-console-consumer.sh --topic billing-events --group billing --from-beginning --max-messages 5 >/dev/null 2>&1"
 Enter Sleep 10s
 Type "clear"
 Enter
