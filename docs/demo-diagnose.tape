@@ -13,8 +13,10 @@ Set TypingSpeed 40ms
 Hide
 Type "export MQX_CONFIG=$PWD/deploy/mqx-config.yaml PS1='$ ' && clear"
 Enter
-Type "docker compose up -d --wait kafka >/dev/null 2>&1"
-Enter Sleep 20s
+Type "docker compose up -d kafka >/dev/null 2>&1"
+Enter
+Type 'until docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1; do sleep 2; done'
+Enter Sleep 45s
 Type 'k() { local c=$1; shift; docker compose exec -T kafka /opt/kafka/bin/$c --bootstrap-server localhost:9092 "$@"; }'
 Enter
 Type "k kafka-topics.sh --delete --topic billing-events >/dev/null 2>&1; k kafka-consumer-groups.sh --delete --group billing >/dev/null 2>&1"
