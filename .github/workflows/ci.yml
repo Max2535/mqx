@@ -44,6 +44,8 @@ jobs:
       - name: Measure coverage
         run: |
           go test -covermode=atomic -coverprofile=coverage.out ./...
+          echo "::notice title=coverage-total::$(go tool cover -func=coverage.out | tail -n 1)"
+          go test -cover ./... 2>&1 | grep -v 'no test files' | while read -r l; do echo "::notice title=coverage-pkg::$l"; done
           {
             echo '### Coverage'
             echo '```'
