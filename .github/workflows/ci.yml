@@ -34,6 +34,33 @@ jobs:
           go-version-file: go.mod
       - run: go test -race ./...
 
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Measure coverage
+        run: |
+          go test -covermode=atomic -coverprofile=coverage.out ./...
+          {
+            echo '### Coverage'
+            echo '```'
+            go tool cover -func=coverage.out | tail -n 1
+            echo '```'
+            echo '<details><summary>Per package</summary>'
+            echo
+            echo '```'
+            go test -cover ./... 2>&1 | grep -v 'no test files'
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 45
