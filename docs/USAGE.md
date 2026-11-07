@@ -238,8 +238,8 @@ Mutating commands work like this:
 
 `mqx mcp` serves one context's read-only broker tools over the
 [Model Context Protocol](https://modelcontextprotocol.io) on stdio. MCP clients
-such as Claude Code, Claude Desktop and Cursor can then query the broker for
-you. These are the same tools the TUI Assistant uses.
+such as Claude Code, Claude Desktop, Cursor and VS Code (GitHub Copilot) can
+then query the broker for you. These are the same tools the TUI Assistant uses.
 
 ```sh
 mqx mcp --context prod-kafka                    # bound to prod-kafka
@@ -289,10 +289,9 @@ Or check it into a project as `.mcp.json`:
 }
 ```
 
-### Claude Desktop, Cursor and other clients
+### Claude Desktop
 
-Add the same `command` and `args` to the client's MCP config. For example, in
-Claude Desktop's `claude_desktop_config.json`:
+In `claude_desktop_config.json`:
 
 ```json
 {
@@ -307,3 +306,49 @@ Claude Desktop's `claude_desktop_config.json`:
 ```
 
 Desktop apps often start with a minimal `PATH`, so give the full path to `mqx`.
+
+### Cursor
+
+Cursor uses the same `mcpServers` shape, in `.cursor/mcp.json` for one project
+or `~/.cursor/mcp.json` for all of them:
+
+```json
+{
+  "mcpServers": {
+    "mqx-local": {
+      "command": "mqx",
+      "args": ["mcp", "--context", "local-kafka"]
+    }
+  }
+}
+```
+
+The tools show up in Agent mode.
+
+### VS Code (GitHub Copilot)
+
+VS Code reads `.vscode/mcp.json`, which uses a `servers` key and can prompt for
+secrets instead of storing them:
+
+```json
+{
+  "inputs": [
+    { "type": "promptString", "id": "kafka-pass", "description": "prod Kafka password", "password": true }
+  ],
+  "servers": {
+    "mqx-prod": {
+      "type": "stdio",
+      "command": "mqx",
+      "args": ["mcp", "--context", "prod-kafka"],
+      "env": { "PROD_KAFKA_USER": "svc-mqx", "PROD_KAFKA_PASS": "${input:kafka-pass}" }
+    }
+  }
+}
+```
+
+Use the tools from Copilot Chat in Agent mode.
+
+### Other clients
+
+Any client that starts stdio servers works: run `mqx mcp --context <name>` with
+the context's credential variables in its environment.

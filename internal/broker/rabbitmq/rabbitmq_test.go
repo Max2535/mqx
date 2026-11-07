@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -414,6 +415,51 @@ func TestPutUserKeepsPasswordWhenEmpty(t *testing.T) {
 	}
 	if !reflect.DeepEqual(f.bodies, want) {
 		t.Errorf("bodies = %q", f.bodies)
+	}
+}
+
+// RabbitMQ 4.4 reports only has_password on /api/users/{name}; the hash comes
+// from the definitions export.
+func TestPutUserKeepsPasswordFromDefinitions(t *testing.T) {
+	tests := []struct {
+		name    string
+		user    string
+		defs    string
+		wantPut string
+		wantErr string
+	}{
+		{name: "hash from definitions", user: `{"name":"alice","hashing_algorithm":"rabbit_password_hashing_sha256","has_password":true}`,
+			defs:    `{"users":[{"name":"bob","password_hash":"B"},{"name":"alice","password_hash":"HASH","hashing_algorithm":"rabbit_password_hashing_sha256"}]}`,
+			wantPut: `{"hashing_algorithm":"rabbit_password_hashing_sha256","password_hash":"HASH","tags":"a"}`},
+		{name: "no password to keep", user: `{"name":"alice","has_password":false}`, wantPut: `{"tags":"a"}`},
+		{name: "hash unreadable refuses", user: `{"name":"alice","has_password":true}`, defs: `{"users":[]}`,
+			wantErr: "would clear it"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f, r := newFakeAPI(t)
+			f.json("GET /api/users/alice", tt.user)
+			if tt.defs != "" {
+				f.json("GET /api/definitions", tt.defs)
+			}
+			f.status("PUT /api/users/alice", http.StatusNoContent, "")
+			err := r.PutUser(context.Background(), broker.User{Name: "alice", Tags: []string{"a"}}, "")
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("err = %v, want %q", err, tt.wantErr)
+				}
+				if slices.Contains(f.requests, "PUT /api/users/alice") {
+					t.Fatal("PUT sent although the password could not be kept")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := f.bodies[len(f.bodies)-1]; got != tt.wantPut {
+				t.Errorf("PUT body = %s, want %s", got, tt.wantPut)
+			}
+		})
 	}
 }
 

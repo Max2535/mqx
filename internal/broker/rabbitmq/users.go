@@ -66,25 +66,64 @@ func (r *RabbitMQ) PutUser(ctx context.Context, u broker.User, password string) 
 		body["password"] = password
 	} else {
 		// A PUT without a password clears it, so carry the current hash over.
-		var cur struct {
-			PasswordHash     string `json:"password_hash"`
-			HashingAlgorithm string `json:"hashing_algorithm"`
+		hash, err := r.passwordHash(ctx, u.Name)
+		if err != nil {
+			return fmt.Errorf("put user %q: %w", u.Name, err)
 		}
-		err := r.mgmt.get(ctx, apiPath("users", u.Name), &cur)
-		switch {
-		case err == nil:
-			body["password_hash"] = cur.PasswordHash
-			if cur.HashingAlgorithm != "" {
-				body["hashing_algorithm"] = cur.HashingAlgorithm
+		if hash != nil {
+			body["password_hash"] = hash.PasswordHash
+			if hash.HashingAlgorithm != "" {
+				body["hashing_algorithm"] = hash.HashingAlgorithm
 			}
-		case !errors.Is(err, errNotFound):
-			return fmt.Errorf("put user %q: read current password hash: %w", u.Name, err)
 		}
 	}
 	if err := r.mgmt.put(ctx, apiPath("users", u.Name), body); err != nil {
 		return fmt.Errorf("put user %q: %w", u.Name, err)
 	}
 	return nil
+}
+
+type passwordHash struct {
+	PasswordHash     string `json:"password_hash"`
+	HashingAlgorithm string `json:"hashing_algorithm"`
+}
+
+// passwordHash returns an existing user's password hash, or nil when the user
+// does not exist or has no password. RabbitMQ before 4.4 returns the hash from
+// /api/users/{name}; 4.4 only reports has_password there, so the hash is read
+// from the definitions export instead. It fails rather than return nil for a
+// user whose password it cannot read, so a tag change never clears a password.
+func (r *RabbitMQ) passwordHash(ctx context.Context, name string) (*passwordHash, error) {
+	var cur struct {
+		passwordHash
+		HasPassword *bool `json:"has_password"`
+	}
+	err := r.mgmt.get(ctx, apiPath("users", name), &cur)
+	switch {
+	case errors.Is(err, errNotFound):
+		return nil, nil
+	case err != nil:
+		return nil, fmt.Errorf("read current password hash: %w", err)
+	case cur.PasswordHash != "":
+		return &cur.passwordHash, nil
+	case cur.HasPassword != nil && !*cur.HasPassword:
+		return nil, nil
+	}
+	var defs struct {
+		Users []struct {
+			Name string `json:"name"`
+			passwordHash
+		} `json:"users"`
+	}
+	if err := r.mgmt.get(ctx, apiPath("definitions"), &defs); err != nil {
+		return nil, fmt.Errorf("read current password hash from definitions: %w", err)
+	}
+	for _, u := range defs.Users {
+		if u.Name == name && u.PasswordHash != "" {
+			return &u.passwordHash, nil
+		}
+	}
+	return nil, fmt.Errorf("cannot read the current password of %q, so changing only its tags would clear it; pass a password", name)
 }
 
 // DeleteUser deletes a user.
