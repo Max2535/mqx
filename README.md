@@ -87,8 +87,7 @@ message payloads.
 
 `mqx mcp` serves the same read-only tools to Claude Code, Claude Desktop, Cursor,
 VS Code (GitHub Copilot) or any other MCP client. Each server is bound to one
-context and never changes
-the broker.
+context and never changes the broker.
 
 ```sh
 claude mcp add mqx-local -- mqx mcp --context local-kafka
